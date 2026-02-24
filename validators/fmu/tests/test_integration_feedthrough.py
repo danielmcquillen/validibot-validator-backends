@@ -1,9 +1,9 @@
 """
-Integration-style FMI test using the Feedthrough.fmu fixture.
+Integration-style FMU test using the Feedthrough.fmu fixture.
 
 This exercises the runner against a real FMU (no network, local file copy). It
 monkeypatches download_file to copy the fixture into the working directory,
-builds a typed FMIInputEnvelope, and asserts the output echoes the input for
+builds a typed FMUInputEnvelope, and asserts the output echoes the input for
 the known feedthrough variable.
 
 Two FMU fixtures are available:
@@ -19,8 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from validators.fmi import runner
-from validibot_shared.fmi.envelopes import FMIInputEnvelope, FMIInputs, FMIOutputs
+from validators.fmu import runner
+from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUInputs, FMUOutputs
 from validibot_shared.validations.envelopes import (
     ExecutionContext,
     InputFileItem,
@@ -48,11 +48,11 @@ def test_feedthrough_fmu_echoes_input_x86(monkeypatch, tmp_path) -> None:
     def _fake_download(uri: str, dest: Path) -> None:
         shutil.copy(Path(uri), dest)
 
-    monkeypatch.setattr("validators.fmi.runner.download_file", _fake_download)
+    monkeypatch.setattr("validators.fmu.runner.download_file", _fake_download)
 
-    envelope = FMIInputEnvelope(
+    envelope = FMUInputEnvelope(
         run_id="test-run",
-        validator={"id": "1", "type": "FMI", "version": "1"},
+        validator={"id": "1", "type": "FMU", "version": "1"},
         org={"id": "1", "name": "Test Org"},
         workflow={"id": "1", "step_id": "1", "step_name": "Feedthrough"},
         input_files=[
@@ -63,7 +63,7 @@ def test_feedthrough_fmu_echoes_input_x86(monkeypatch, tmp_path) -> None:
                 uri=str(fixture),
             )
         ],
-        inputs=FMIInputs(
+        inputs=FMUInputs(
             input_values={"Int32_input": 5},
             output_variables=["Int32_output"],
         ),
@@ -73,8 +73,8 @@ def test_feedthrough_fmu_echoes_input_x86(monkeypatch, tmp_path) -> None:
         ),
     )
 
-    outputs, _ = runner.run_fmi_simulation(envelope)
-    assert isinstance(outputs, FMIOutputs)
+    outputs, _ = runner.run_fmu_simulation(envelope)
+    assert isinstance(outputs, FMUOutputs)
     assert outputs.output_values["Int32_output"] == pytest.approx(5)
 
 
@@ -94,11 +94,11 @@ def test_feedthrough_fmu_echoes_input_arm64(monkeypatch, tmp_path) -> None:
     def _fake_download(uri: str, dest: Path) -> None:
         shutil.copy(Path(uri), dest)
 
-    monkeypatch.setattr("validators.fmi.runner.download_file", _fake_download)
+    monkeypatch.setattr("validators.fmu.runner.download_file", _fake_download)
 
-    envelope = FMIInputEnvelope(
+    envelope = FMUInputEnvelope(
         run_id="test-run",
-        validator={"id": "1", "type": "FMI", "version": "1"},
+        validator={"id": "1", "type": "FMU", "version": "1"},
         org={"id": "1", "name": "Test Org"},
         workflow={"id": "1", "step_id": "1", "step_name": "Feedthrough"},
         input_files=[
@@ -109,7 +109,7 @@ def test_feedthrough_fmu_echoes_input_arm64(monkeypatch, tmp_path) -> None:
                 uri=str(fixture),
             )
         ],
-        inputs=FMIInputs(
+        inputs=FMUInputs(
             input_values={"Int32_input": 5},
             output_variables=["Int32_output"],
         ),
@@ -119,6 +119,6 @@ def test_feedthrough_fmu_echoes_input_arm64(monkeypatch, tmp_path) -> None:
         ),
     )
 
-    outputs, _ = runner.run_fmi_simulation(envelope)
-    assert isinstance(outputs, FMIOutputs)
+    outputs, _ = runner.run_fmu_simulation(envelope)
+    assert isinstance(outputs, FMUOutputs)
     assert outputs.output_values["Int32_output"] == pytest.approx(5)

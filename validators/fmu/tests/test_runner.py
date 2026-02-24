@@ -1,10 +1,10 @@
-"""Unit tests for FMI runner helpers (pure functions only)."""
+"""Unit tests for FMU runner helpers (pure functions only)."""
 
 from __future__ import annotations
 
 import numpy as np
 
-from validators.fmi import runner
+from validators.fmu import runner
 
 
 def test_collect_output_values_prefers_result_fields() -> None:

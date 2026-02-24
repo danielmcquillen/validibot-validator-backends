@@ -1,7 +1,7 @@
 """
-FMI validator container entrypoint for Cloud Run Jobs.
+FMU validator container entrypoint for Cloud Run Jobs.
 
-Loads FMIInputEnvelope, runs the FMU with fmpy, writes FMIOutputEnvelope to GCS,
+Loads FMUInputEnvelope, runs the FMU with fmpy, writes FMUOutputEnvelope to GCS,
 and POSTs the callback to Django.
 """
 
@@ -16,7 +16,7 @@ from validators.core.callback_client import post_callback
 from validators.core.envelope_loader import get_output_uri, load_input_envelope
 from validators.core.error_reporting import report_fatal
 from validators.core.gcs_client import upload_directory, upload_envelope
-from validibot_shared.fmi.envelopes import FMIInputEnvelope, FMIOutputEnvelope
+from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUOutputEnvelope
 from validibot_shared.validations.envelopes import (
     RawOutputs,
     Severity,
@@ -26,7 +26,7 @@ from validibot_shared.validations.envelopes import (
     ValidatorType,
 )
 
-from .runner import run_fmi_simulation
+from .runner import run_fmu_simulation
 
 
 if TYPE_CHECKING:
@@ -45,14 +45,14 @@ def main() -> int:
     started_at = datetime.now(UTC)
 
     try:
-        input_envelope = load_input_envelope(FMIInputEnvelope)
+        input_envelope = load_input_envelope(FMUInputEnvelope)
         logger.info(
-            "Loaded FMI input envelope for run_id=%s validator=%s",
+            "Loaded FMU input envelope for run_id=%s validator=%s",
             input_envelope.run_id,
             input_envelope.validator.type,
         )
 
-        outputs, work_dir = run_fmi_simulation(input_envelope)
+        outputs, work_dir = run_fmu_simulation(input_envelope)
 
         status = ValidationStatus.SUCCESS
         finished_at = datetime.now(UTC)
@@ -63,9 +63,9 @@ def main() -> int:
             execution_bundle_uri = str(input_envelope.context.execution_bundle_uri)
             artifacts, raw_outputs = _upload_outputs(work_dir, execution_bundle_uri)
         except Exception:
-            logger.exception("Failed to upload FMI outputs; continuing without artifacts")
+            logger.exception("Failed to upload FMU outputs; continuing without artifacts")
 
-        output_envelope = FMIOutputEnvelope(
+        output_envelope = FMUOutputEnvelope(
             run_id=input_envelope.run_id,
             validator=input_envelope.validator,
             status=status,
@@ -81,7 +81,7 @@ def main() -> int:
         )
 
         output_uri = get_output_uri(input_envelope)
-        logger.info("Uploading FMI output envelope to %s", output_uri)
+        logger.info("Uploading FMU output envelope to %s", output_uri)
         upload_envelope(output_envelope, output_uri)
 
         post_callback(
@@ -96,23 +96,23 @@ def main() -> int:
             callback_id=input_envelope.context.callback_id,
             skip_callback=input_envelope.context.skip_callback,
         )
-        logger.info("FMI validation complete (status=%s)", status.value)
+        logger.info("FMU validation complete (status=%s)", status.value)
         _cleanup(work_dir)
         return 0
 
     except Exception as exc:
-        logger.exception("FMI validation failed with unexpected error")
+        logger.exception("FMU validation failed with unexpected error")
         report_fatal(
             exc,
             context={
                 "run_id": getattr(locals().get("input_envelope", None), "run_id", None),
-                "validator": ValidatorType.FMI,
+                "validator": ValidatorType.FMU,
             },
         )
         try:
             if "input_envelope" in locals():
                 finished_at = datetime.now(UTC)
-                failure_envelope = FMIOutputEnvelope(
+                failure_envelope = FMUOutputEnvelope(
                     run_id=input_envelope.run_id,
                     validator=input_envelope.validator,
                     status=ValidationStatus.FAILED_RUNTIME,
@@ -123,7 +123,7 @@ def main() -> int:
                     messages=[
                         ValidationMessage(
                             severity=Severity.ERROR,
-                            text="FMI validator failed. Please retry or contact support.",
+                            text="FMU validator failed. Please retry or contact support.",
                         )
                     ],
                     outputs=None,

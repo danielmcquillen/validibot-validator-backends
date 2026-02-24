@@ -49,7 +49,7 @@ ar_repo := ar_host + "/" + gcp_project + "/validibot"
 git_sha := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
 
 # Available validators
-validators := "energyplus fmi"
+validators := "energyplus fmu"
 
 # =============================================================================
 # Default - List Commands

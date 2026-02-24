@@ -1,7 +1,7 @@
 """
-FMI Validator Metadata.
+FMU Validator Metadata.
 
-This module defines metadata about the FMI (Functional Mock-up Interface)
+This module defines metadata about the FMU (Functional Mock-up Unit)
 validator container, used by the container launcher to configure execution.
 
 The metadata is exposed at runtime so the orchestrator can query
@@ -12,8 +12,8 @@ from __future__ import annotations
 
 
 # Validator identification
-VALIDATOR_TYPE = "FMI"
-VALIDATOR_NAME = "FMI/FMU Simulation Validator"
+VALIDATOR_TYPE = "FMU"
+VALIDATOR_NAME = "FMU Simulation Validator"
 VALIDATOR_DESCRIPTION = (
     "Runs FMU (Functional Mock-up Unit) simulations using fmpy "
     "and extracts output values for validation assertions."
@@ -21,7 +21,7 @@ VALIDATOR_DESCRIPTION = (
 
 # Container image naming (used by validibot to construct image name)
 # Full image name: {VALIDATOR_IMAGE_REGISTRY}/{IMAGE_NAME}:{tag}
-IMAGE_NAME = "validibot-validator-fmi"
+IMAGE_NAME = "validibot-validator-fmu"
 
 # Environment variables
 # These are the environment variables the container expects
@@ -45,7 +45,7 @@ SUPPORTED_INPUT_TYPES = [
     "application/vnd.fmi.fmu",  # Functional Mock-up Unit
 ]
 
-# Required auxiliary files (none for FMI - FMU is self-contained)
+# Required auxiliary files (none - FMU is self-contained)
 REQUIRED_AUXILIARY_FILES = []
 
 # Resource requirements (defaults, can be overridden by orchestrator)

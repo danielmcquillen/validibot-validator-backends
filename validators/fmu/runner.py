@@ -1,5 +1,5 @@
 """
-FMI simulation runner for Cloud Run Jobs.
+FMU simulation runner for Cloud Run Jobs.
 
 Resolves the FMU from GCS, runs a short simulation with fmpy, and returns
 catalog-keyed outputs suitable for the Django callback pipeline.
@@ -15,18 +15,18 @@ from typing import TYPE_CHECKING
 from fmpy import read_model_description, simulate_fmu
 
 from validators.core.gcs_client import download_file
-from validibot_shared.fmi.envelopes import FMIOutputs
+from validibot_shared.fmu.envelopes import FMUOutputs
 
 
 if TYPE_CHECKING:
-    from validibot_shared.fmi.envelopes import FMIInputEnvelope
+    from validibot_shared.fmu.envelopes import FMUInputEnvelope
 
 logger = logging.getLogger(__name__)
 
 
-def run_fmi_simulation(input_envelope: FMIInputEnvelope) -> tuple[FMIOutputs, Path]:
+def run_fmu_simulation(input_envelope: FMUInputEnvelope) -> tuple[FMUOutputs, Path]:
     """
-    Execute an FMU using fmpy and return FMIOutputs plus the working directory.
+    Execute an FMU using fmpy and return FMUOutputs plus the working directory.
 
     Raises:
         ValueError: If input_envelope is missing required fields
@@ -45,7 +45,7 @@ def run_fmi_simulation(input_envelope: FMIInputEnvelope) -> tuple[FMIOutputs, Pa
         raise ValueError("input_envelope.inputs.simulation is required")
 
     start_time = time.time()
-    work_dir = Path("/tmp/fmi_run") / input_envelope.run_id
+    work_dir = Path("/tmp/fmu_run") / input_envelope.run_id
     work_dir.mkdir(parents=True, exist_ok=True)
 
     fmu_path = _download_fmu(input_envelope, work_dir)
@@ -84,7 +84,7 @@ def run_fmi_simulation(input_envelope: FMIInputEnvelope) -> tuple[FMIOutputs, Pa
         )
         execution_seconds = time.time() - start_time
 
-        outputs = FMIOutputs(
+        outputs = FMUOutputs(
             output_values=output_values,
             fmu_guid=md.get("guid"),
             fmi_version=md.get("fmi_version"),
@@ -95,9 +95,9 @@ def run_fmi_simulation(input_envelope: FMIInputEnvelope) -> tuple[FMIOutputs, Pa
         )
         return outputs, work_dir
     except Exception as exc:
-        logger.exception("FMI simulation failed: %s", exc)
+        logger.exception("FMU simulation failed: %s", exc)
         execution_seconds = time.time() - start_time
-        outputs = FMIOutputs(
+        outputs = FMUOutputs(
             output_values=start_values,
             fmu_guid=md.get("guid"),
             fmi_version=md.get("fmi_version"),
@@ -106,7 +106,7 @@ def run_fmi_simulation(input_envelope: FMIInputEnvelope) -> tuple[FMIOutputs, Pa
             simulation_time_reached=sim_cfg.start_time,
             fmu_log="\n".join(log_messages) if log_messages else str(exc),
         )
-        raise RuntimeError(f"FMI simulation failed: {exc}") from exc
+        raise RuntimeError(f"FMU simulation failed: {exc}") from exc
 
 
 def _download_fmu(input_envelope, work_dir: Path) -> Path:

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Renamed `validators/fmi/` directory to `validators/fmu/`
+  - All class/function references: `FMI*` -> `FMU*` (e.g., `run_fmi_simulation()` -> `run_fmu_simulation()`)
+  - Docker image: `validibot-validator-fmi` -> `validibot-validator-fmu`
+  - Validator type: `"FMI"` -> `"FMU"`
+  - Updated imports to use `validibot_shared.fmu` (requires validibot-shared >= 0.3.0)
+  - Justfile, pyproject.toml, and test paths updated accordingly
+
 ### Added
 
 - Pre-commit hooks with TruffleHog secret scanning, detect-private-key, and Ruff linting

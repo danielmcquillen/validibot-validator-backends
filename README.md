@@ -49,7 +49,7 @@ The core Validibot platform triggers these containers, passes input via the stan
 | Validator      | Description                                    | Use Cases                                                        |
 | -------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
 | **EnergyPlus** | Validates and simulates building energy models | IDF/epJSON schema validation, simulation runs, energy metrics    |
-| **FMI**        | Validates and probes Functional Mock-up Units  | FMU structure validation, variable discovery, simulation testing |
+| **FMU**        | Validates and probes Functional Mock-up Units  | FMU structure validation, variable discovery, simulation testing |
 
 ## How It Works
 
@@ -290,7 +290,7 @@ validibot-validators/
     │   ├── runner.py         # Simulation logic
     │   └── tests/
     │
-    └── fmi/                  # FMI/FMU validator
+    └── fmu/                  # FMU validator
         ├── Dockerfile
         ├── __metadata__.py
         ├── main.py
@@ -470,7 +470,7 @@ The `validators.core` module provides helpers for steps 2, 5, 6, and 7.
 │ validibot-cli   │    │ validibot-validators│    │ validibot-shared    │
 │                 │    │   (this repo)       │    │                     │
 │ Terminal access │    │                     │    │ Pydantic models     │
-│ to API          │    │ EnergyPlus, FMI     │    │ (shared contract)   │
+│ to API          │    │ EnergyPlus, FMU     │    │ (shared contract)   │
 │                 │    │ containers          │    │                     │
 └─────────────────┘    └─────────────────────┘    └─────────────────────┘
 ```

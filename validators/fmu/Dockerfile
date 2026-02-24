@@ -1,7 +1,7 @@
-# Cloud Run Job image for FMI validator
+# Cloud Run Job image for FMU validator
 #
-# Build context must be vb_validators/ (not validators/fmi/)
-# Build with: docker build -f validators/fmi/Dockerfile -t ... .
+# Build context must be vb_validators/ (not validators/fmu/)
+# Build with: docker build -f validators/fmu/Dockerfile -t ... .
 
 FROM python:3.13-slim
 
@@ -15,10 +15,10 @@ WORKDIR /app
 ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 # Copy requirements first (for layer caching)
-COPY validators/fmi/requirements.txt .
+COPY validators/fmu/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire validators package (includes core, fmi, and __init__.py)
+# Copy the entire validators package (includes core, fmu, and __init__.py)
 COPY validators /app/validators
 
 # Create non-root user for container execution
@@ -28,4 +28,4 @@ RUN groupadd --gid 1000 validibot \
 USER validibot
 
 # Run as a module so relative imports work correctly
-CMD ["python", "-m", "validators.fmi.main"]
+CMD ["python", "-m", "validators.fmu.main"]
