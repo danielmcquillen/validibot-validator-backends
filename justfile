@@ -161,7 +161,7 @@ build-push-all:
 # =============================================================================
 
 # Deploy a validator as a Cloud Run Job to a specific stage
-# Usage: just deploy energyplus dev | just deploy fmi prod
+# Usage: just deploy energyplus dev | just deploy fmu prod
 deploy validator stage: (build-push validator)
     #!/usr/bin/env bash
     set -euo pipefail
