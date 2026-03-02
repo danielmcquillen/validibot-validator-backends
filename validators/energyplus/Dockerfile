@@ -1,4 +1,9 @@
-# Multi-stage build for EnergyPlus validator container
+# Multi-stage build for EnergyPlus™ validator container
+#
+# EnergyPlus™ is a trademark of the U.S. Department of Energy.
+# EnergyPlus is distributed under a BSD-3-Clause license by NREL.
+# The EnergyPlus license is preserved at /opt/energyplus/ in the built image.
+# See: https://github.com/NREL/EnergyPlus/blob/develop/LICENSE.txt
 #
 # Build context must be vb_validators/ (not validators/energyplus/)
 # Build with: docker build -f validators/energyplus/Dockerfile -t ... .
@@ -39,7 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy EnergyPlus from builder stage
+# Copy EnergyPlus from builder stage (includes LICENSE.txt for BSD-3-Clause compliance)
 COPY --from=energyplus-builder /opt/energyplus /opt/energyplus
 
 # Add EnergyPlus to PATH

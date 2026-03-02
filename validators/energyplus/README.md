@@ -1,6 +1,6 @@
-# EnergyPlus Validator Container
+# EnergyPlus™ Validator Container
 
-Container for running EnergyPlus simulations as part of validation workflows. Can be deployed as a Cloud Run Job, Kubernetes Job, or run locally via Docker.
+Container for running [EnergyPlus™](https://energyplus.net/) simulations as part of validation workflows. Can be deployed as a Cloud Run Job, Kubernetes Job, or run locally via Docker.
 
 ## Overview
 
@@ -171,10 +171,14 @@ uv sync
 just test-validator energyplus
 ```
 
-## EnergyPlus Version
+## EnergyPlus™ Version
 
-This container uses EnergyPlus 25.2.0. To update:
+This container uses EnergyPlus™ 25.2.0. To update:
 
 1. Modify `Dockerfile` to install different version
 2. Update `validator.version` in Django database
 3. Rebuild and redeploy container
+
+---
+
+EnergyPlus™ is a trademark of the U.S. Department of Energy. EnergyPlus is distributed under a BSD-3-Clause license by the National Renewable Energy Laboratory (NREL). Validibot is not affiliated with, endorsed by, or sponsored by DOE or NREL.

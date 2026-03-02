@@ -38,7 +38,7 @@ This repository is one component of the Validibot open-source data validation pl
 Validibot "Advanced Validators" are Docker containers that perform specialized, resource-intensive data validations within the Validibot app. Unlike Validibot's built-in "simple" validators (JSON Schema, XML Schema, etc.) that run directly in the Django process, advanced validators:
 
 - **Run in isolation** — Each advanced validation runs in its own container with resource limits
-- **Have complex dependencies** — EnergyPlus, FMPy, and other domain-specific tools
+- **Have complex dependencies** — [EnergyPlus™](https://energyplus.net/), FMPy, and other domain-specific tools
 - **Are secure by default** — Network isolation, memory limits, and automatic cleanup
 - **Scale independently** — Can run on separate infrastructure from the core platform
 
@@ -48,7 +48,7 @@ The core Validibot platform triggers these containers, passes input via the stan
 
 | Validator      | Description                                    | Use Cases                                                        |
 | -------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
-| **EnergyPlus** | Validates and simulates building energy models | IDF/epJSON schema validation, simulation runs, energy metrics    |
+| **EnergyPlus™** | Validates and simulates building energy models | IDF/epJSON schema validation, simulation runs, energy metrics    |
 | **FMU**        | Validates and probes Functional Mock-up Units  | FMU structure validation, variable discovery, simulation testing |
 
 ## How It Works
@@ -75,7 +75,7 @@ After running validation, the container writes an output envelope with:
 >
 > **Data handling:** Input files are transmitted to and stored in your configured storage backend (GCS, local filesystem). You are responsible for the confidentiality and handling of your data.
 >
-> **No warranty for results:** Simulation and validation results (e.g., EnergyPlus energy metrics) are approximations only. Results should be independently verified before use in critical applications. See the [LICENSE](LICENSE) for full warranty disclaimer.
+> **No warranty for results:** Simulation and validation results (e.g., EnergyPlus™ energy metrics) are approximations only. Results should be independently verified before use in critical applications. See the [LICENSE](LICENSE) for full warranty disclaimer.
 
 ## Quick Start
 
@@ -470,7 +470,7 @@ The `validators.core` module provides helpers for steps 2, 5, 6, and 7.
 │ validibot-cli   │    │ validibot-validators│    │ validibot-shared    │
 │                 │    │   (this repo)       │    │                     │
 │ Terminal access │    │                     │    │ Pydantic models     │
-│ to API          │    │ EnergyPlus, FMU     │    │ (shared contract)   │
+│ to API          │    │ EnergyPlus™, FMU    │    │ (shared contract)   │
 │                 │    │ containers          │    │                     │
 └─────────────────┘    └─────────────────────┘    └─────────────────────┘
 ```
@@ -501,6 +501,10 @@ These validators build on excellent open-source projects:
 
 - [EnergyPlus](https://energyplus.net/) — Whole building energy simulation (U.S. Department of Energy / NREL, BSD-3-Clause)
 - [FMPy](https://github.com/CATIA-Systems/FMPy) — FMU simulation in Python (Dassault Systèmes, BSD-3-Clause)
+
+## Trademarks
+
+EnergyPlus™ is a trademark of the U.S. Department of Energy. Validibot is not affiliated with, endorsed by, or sponsored by the U.S. Department of Energy or the National Renewable Energy Laboratory (NREL).
 
 ## License
 
