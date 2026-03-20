@@ -5,7 +5,7 @@
 # The EnergyPlus license is preserved at /opt/energyplus/ in the built image.
 # See: https://github.com/NREL/EnergyPlus/blob/develop/LICENSE.txt
 #
-# Build context must be vb_validators/ (not validators/energyplus/)
+# Build context must be validibot-validators/ (not validators/energyplus/)
 # Build with: docker build -f validators/energyplus/Dockerfile -t ... .
 
 # =============================================================================

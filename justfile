@@ -20,7 +20,7 @@
 #   the main validibot justfile (../validibot/justfile) which has equivalent
 #   commands. Both work - use whichever is more convenient:
 #
-#     From vb_validators/:  just deploy energyplus dev
+#     From validibot-validators/:  just deploy energyplus dev
 #     From validibot/:      just validator-deploy energyplus dev
 #
 # =============================================================================
@@ -94,7 +94,7 @@ check: lint test
 # =============================================================================
 
 # Build a validator container locally (for testing only)
-# Build context is the repo root (vb_validators/), not the validator subdirectory
+# Build context is the repo root (validibot-validators/), not the validator subdirectory
 # Builds for linux/amd64 since Cloud Run requires that architecture
 build validator:
     @echo "Building {{validator}} container..."

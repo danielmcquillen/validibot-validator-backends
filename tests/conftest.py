@@ -1,5 +1,5 @@
 """
-Shared pytest fixtures for vb_validators tests.
+Shared pytest fixtures for validibot-validators tests.
 """
 
 from __future__ import annotations

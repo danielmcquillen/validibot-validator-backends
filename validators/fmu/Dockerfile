@@ -1,6 +1,6 @@
 # Cloud Run Job image for FMU validator
 #
-# Build context must be vb_validators/ (not validators/fmu/)
+# Build context must be validibot-validators/ (not validators/fmu/)
 # Build with: docker build -f validators/fmu/Dockerfile -t ... .
 
 FROM python:3.13-slim
