@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-20
+
+### Changed
+
+- **FMU runner**: Clarified that the runner consumes and returns native
+  FMU variable names exactly as specified in the envelope. The core
+  Django app maps these to `SignalDefinition` rows on ingestion.
+- **FMU README**: Updated to reflect native variable name contract
+  (previously said "catalog-keyed inputs").
+
 ## [0.3.2] - 2026-03-10
 
 ### Added

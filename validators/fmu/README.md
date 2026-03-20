@@ -8,4 +8,4 @@ Minimal Cloud Run Job container for FMU validators. It:
 4. Writes `output.json` back to GCS and POSTs the callback
 
 The container mirrors the contract defined in `validibot_shared.fmu.envelopes`.
-Use the Django launcher to provide catalog-keyed inputs and callback info.
+Use the Django launcher to provide native FMU variable names and callback info.
