@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-03-25
+
+### Fixed
+
+- Pinned the validator runtime and development dependencies to exact versions for reproducible builds.
+- Updated the validator containers to require `validibot-shared==0.4.2` and aligned the shared `pydantic` pin used during locking.
+
 ## [0.4.1] - 2026-03-20
 
 ### Fixed
