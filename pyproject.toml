@@ -34,12 +34,12 @@ classifiers = [
 
 # Core dependencies shared by all validators
 dependencies = [
-    "pydantic==2.12.3",
+    "pydantic==2.12.5",
     "httpx==0.28.1",
-    "google-cloud-storage==3.9.0",
-    "google-auth==2.48.0",
-    "requests==2.32.5",
-    "sentry-sdk==2.52.0",
+    "google-cloud-storage==3.10.1",
+    "google-auth==2.49.1",
+    "requests==2.33.0",
+    "sentry-sdk==2.56.0",
     "validibot-shared==0.4.2",
 ]
 
@@ -47,8 +47,8 @@ dependencies = [
 dev = [
     "pytest==9.0.2",
     "pytest-mock==3.15.1",
-    "pytest-cov==7.0.0",
-    "ruff==0.15.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.15.8",
     "mypy==1.19.1",
 ]
 
@@ -58,7 +58,7 @@ energyplus = [
 ]
 
 # FMU validator dependencies (for local dev/testing)
-fmu = ["fmpy==0.3.27"]
+fmu = ["fmpy==0.3.29"]
 
 [project.urls]
 Homepage = "https://validibot.com"
