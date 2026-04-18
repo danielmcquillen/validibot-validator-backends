@@ -189,7 +189,7 @@ deploy validator stage: (build-push validator)
         --cpu 2 \
         --max-retries 0 \
         --task-timeout 3600 \
-        --set-env-vars "PYTHONUNBUFFERED=1,VALIDATOR_VERSION={{git_sha}},VALIDIBOT_STAGE={{stage}}" \
+        --set-env-vars "PYTHONUNBUFFERED=1,VALIDATOR_VERSION={{git_sha}},VALIDIBOT_STAGE={{stage}},DEPLOYMENT_TARGET=gcp" \
         --labels "validator={{validator}},version={{git_sha}},stage={{stage}}"
     echo "✓ $JOB_NAME deployed"
 

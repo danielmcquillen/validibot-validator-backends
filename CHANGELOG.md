@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-18
+
+### Added
+
+- **Platform-agnostic callback authentication** — new `validators/core/callback_auth.py`
+  module introduces a `CallbackAuth` abstract base class and three concrete
+  backends:
+  - `GCPCallbackAuth` — fetches a Google-signed OIDC identity token from the
+    GCE metadata server on every callback. Used when `DEPLOYMENT_TARGET=gcp`.
+  - `SharedSecretCallbackAuth` — sends `Authorization: Worker-Key <secret>`
+    using `WORKER_API_KEY`. Used for Docker Compose and local dev.
+  - `NullCallbackAuth` — no auth headers (for tests / trusted local runs).
+
+  Backend selection is factory-driven off the `DEPLOYMENT_TARGET` environment
+  variable, matching the Django side (`validibot/core/api/task_auth.py`). See
+  [ADR-2026-04-18](https://github.com/mcquilleninteractive/validibot-project/blob/main/docs/adr/2026-04-18-worker-endpoint-auth-platform-agnostic.md).
+
+- **New environment variables** (validator Cloud Run Jobs):
+  - `DEPLOYMENT_TARGET` — required; `just deploy` now passes `gcp` automatically.
+  - `TASK_OIDC_AUDIENCE` — optional override. When unset, `GCPCallbackAuth`
+    derives the audience from the callback URL's origin (scheme + host, NO
+    path), which matches Cloud Tasks/Scheduler's audience semantics and is
+    what Django strict-verifies.
+  - `WORKER_API_KEY` — still honoured on `docker_compose`.
+
+- **24 new auth backend tests** in `validators/core/tests/test_callback_auth.py`
+  covering fail-closed behaviour, metadata-server error paths, audience
+  derivation, header-caching semantics, and factory selection. 7 client tests
+  rewritten to exercise the new auth contract.
+
+### Changed
+
+- **BREAKING (GCP only)**: OIDC audience is now origin-only (`https://host`),
+  previously the full callback URL. Cloud Tasks and Cloud Scheduler have
+  always signed tokens with the origin, so Django's strict verification would
+  reject any validator still sending a full-URL audience. Anyone pinned to
+  0.4.x running on GCP must upgrade in lockstep with the Django worker
+  deploy that ships the matching `CloudTasksOIDCAuthentication` class.
+
+- `just deploy` now passes `DEPLOYMENT_TARGET=gcp` to the Cloud Run Job env.
+  Existing deployments will continue to work because the factory defaults to
+  the GCP backend when `DEPLOYMENT_TARGET` is unset AND a Google-signed
+  metadata server is reachable, but redeploying is strongly recommended so
+  the env var is set explicitly.
+
+### Security
+
+- Fail-closed design throughout: empty allowlist, missing audience, missing
+  `google-auth`, and metadata-server errors all return an empty header set
+  so the callback fails authentication at the worker rather than silently
+  bypassing it.
+
 ## [0.4.2] - 2026-03-25
 
 ### Fixed

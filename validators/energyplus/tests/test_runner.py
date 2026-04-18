@@ -102,8 +102,20 @@ def _make_sql_db(tmp_path: Path, *, with_report_data: bool = False) -> Path:
     # TabularData uses old-style column names (not used by current code,
     # kept for schema compatibility).
     tabular_rows = [
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Total End Uses", "Electricity", "0.36"),
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Total End Uses", "Natural Gas", "0.18"),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Total End Uses",
+            "Electricity",
+            "0.36",
+        ),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Total End Uses",
+            "Natural Gas",
+            "0.18",
+        ),
         ("Entire Facility", "Building Area", "Total Building Area", "Area", "25"),
     ]
     cur.executemany("INSERT INTO TabularData VALUES (?, ?, ?, ?, ?)", tabular_rows)
@@ -111,14 +123,63 @@ def _make_sql_db(tmp_path: Path, *, with_report_data: bool = False) -> Path:
     # TabularDataWithStrings matches the EnergyPlus 25.x view schema.
     # Energy values are in GJ:  0.36 GJ ≈ 100 kWh,  0.18 GJ ≈ 50 kWh.
     tdws_rows = [
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Total End Uses", "Electricity", "0.36", "GJ"),
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Total End Uses", "Natural Gas", "0.18", "GJ"),
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Total End Uses", "Water", "0.00", "m3"),
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Heating", "Electricity", "0.10", "GJ"),
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Heating", "Natural Gas", "0.08", "GJ"),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Total End Uses",
+            "Electricity",
+            "0.36",
+            "GJ",
+        ),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Total End Uses",
+            "Natural Gas",
+            "0.18",
+            "GJ",
+        ),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Total End Uses",
+            "Water",
+            "0.00",
+            "m3",
+        ),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Heating",
+            "Electricity",
+            "0.10",
+            "GJ",
+        ),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Heating",
+            "Natural Gas",
+            "0.08",
+            "GJ",
+        ),
         ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Heating", "Water", "0.00", "m3"),
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Cooling", "Electricity", "0.15", "GJ"),
-        ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Cooling", "Natural Gas", "0.00", "GJ"),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Cooling",
+            "Electricity",
+            "0.15",
+            "GJ",
+        ),
+        (
+            "AnnualBuildingUtilityPerformanceSummary",
+            "End Uses",
+            "Cooling",
+            "Natural Gas",
+            "0.00",
+            "GJ",
+        ),
         ("AnnualBuildingUtilityPerformanceSummary", "End Uses", "Cooling", "Water", "0.00", "m3"),
         ("Entire Facility", "Building Area", "Total Building Area", "Area", "25", "m2"),
     ]

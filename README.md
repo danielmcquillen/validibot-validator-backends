@@ -238,11 +238,35 @@ See [justfile.local.example](justfile.local.example) for more configuration opti
 
 Advanced validators receive configuration via environment variables:
 
-| Variable               | Required | Description                                           |
-| ---------------------- | -------- | ----------------------------------------------------- |
-| `VALIDIBOT_INPUT_URI`  | Yes      | Storage URI to input envelope                         |
-| `VALIDIBOT_OUTPUT_URI` | No       | Storage URI for output (defaults to sibling of input) |
-| `VALIDIBOT_RUN_ID`     | No       | Validation run ID (for logging)                       |
+| Variable                         | Required          | Description                                                                                                                                     |
+| -------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VALIDIBOT_INPUT_URI`            | Yes               | Storage URI to input envelope                                                                                                                   |
+| `VALIDIBOT_OUTPUT_URI`           | No                | Storage URI for output (defaults to sibling of input)                                                                                           |
+| `VALIDIBOT_RUN_ID`               | No                | Validation run ID (for logging)                                                                                                                 |
+| `DEPLOYMENT_TARGET`              | No                | Selects the callback auth backend: `gcp`, `docker_compose`, `aws`, `local_docker_compose`, `test`. Set to `gcp` automatically by `just deploy`. |
+| `TASK_OIDC_AUDIENCE`             | GCP only          | Override the OIDC audience. If unset, derived from the callback URL's origin (scheme + host). Needed when the worker is fronted by a load balancer that signs with a different audience. |
+| `WORKER_API_KEY`                 | Docker / AWS only | Shared secret sent as `Authorization: Worker-Key …` on callbacks. Must match the Django-side `WORKER_API_KEY`.                                   |
+
+### Callback Authentication
+
+Validator containers POST completion callbacks back to the Django
+worker service. The HTTP layer in `validators/core/callback_client.py`
+is deployment-target agnostic — authentication headers are produced
+by a pluggable backend in `validators/core/callback_auth.py`:
+
+| Deployment | Backend                     | Header sent                                                                   |
+| ---------- | --------------------------- | ----------------------------------------------------------------------------- |
+| **GCP**    | `GCPCallbackAuth`           | `Authorization: Bearer <google-signed OIDC id token>` fetched from the metadata server. Audience is the **callback URL's origin** (scheme+host, **no path**) to match how Cloud Tasks / Cloud Scheduler sign tokens. |
+| **Docker Compose / AWS** | `SharedSecretCallbackAuth` | `Authorization: Worker-Key <WORKER_API_KEY>` (matches Django's `WorkerKeyAuthentication`). |
+| **Local / test**         | `NullCallbackAuth`          | No header (Django's matching target skips the auth check).                     |
+
+The factory (`get_callback_auth()`) reads `DEPLOYMENT_TARGET` at
+startup and caches the backend for the container's lifetime, so the
+google-auth transport's connection pool is reused across callbacks.
+
+See
+[ADR-2026-04-18: Platform-Agnostic Worker Endpoint Authentication](https://github.com/mcquilleninteractive/validibot-project/blob/main/docs/adr/2026-04-18-worker-endpoint-auth-platform-agnostic.md)
+for the full cross-repo architecture.
 
 ### Storage URIs
 
@@ -280,7 +304,8 @@ validibot-validators/
 └── validators/
     ├── core/                 # Shared utilities
     │   ├── storage_client.py     # Storage I/O (gs:// and file://)
-    │   ├── callback_client.py    # HTTP callback utilities
+    │   ├── callback_client.py    # HTTP callback transport (retry, timeout)
+    │   ├── callback_auth.py      # Deployment-target-aware auth backends
     │   └── envelope_loader.py    # Envelope serialization
     │
     ├── energyplus/           # EnergyPlus validator
