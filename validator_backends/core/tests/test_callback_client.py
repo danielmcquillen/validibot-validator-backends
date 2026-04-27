@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import httpx
 
-from validators.core import callback_client
-from validators.core.callback_auth import CallbackAuth
+from validator_backends.core import callback_client
+from validator_backends.core.callback_auth import CallbackAuth
 from validibot_shared.validations.envelopes import ValidationStatus
 
 

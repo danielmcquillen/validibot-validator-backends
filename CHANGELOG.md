@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (BREAKING)
+
+- **Repository renamed** from `validibot-validators` to
+  `validibot-validator-backends`. The GitHub URL, package name, and the
+  internal Python module are all renamed in lockstep. GitHub auto-redirects
+  the old clone URL, but explicit updates are recommended.
+- **Python package renamed** in `pyproject.toml` from `validibot-validators` to
+  `validibot-validator-backends`. Anything pulling this in via `pip install` or
+  declaring it as a dependency must update the distribution name.
+- **Internal module renamed** from `validators/` to `validator_backends/`.
+  - All Python imports of `from validators.X import …` must become
+    `from validator_backends.X import …`.
+  - Any monkeypatch / `setattr` strings naming `"validators.fmu.runner..."`
+    must update to `"validator_backends.fmu.runner..."`.
+  - Pytest test paths, ruff/mypy targets, and coverage source all moved.
+- **Docker image names renamed** from `validibot-validator-{validator}` to
+  `validibot-validator-backend-{validator}`. Examples:
+  - `validibot-validator-energyplus` → `validibot-validator-backend-energyplus`
+  - `validibot-validator-fmu` → `validibot-validator-backend-fmu`
+  - `IMAGE_NAME` constants in each `__metadata__.py` moved in lockstep.
+- **Cloud Run job names renamed** to match the new image-name prefix. Existing
+  jobs (`validibot-validator-energyplus`, etc.) are NOT updated by
+  `just deploy` — running it after this change creates new jobs alongside the
+  old ones. Old jobs need manual `gcloud run jobs delete` after the new ones
+  are confirmed working.
+- **Dockerfile build paths updated.** Build context still the repo root, but
+  `-f` paths now reference `validator_backends/{name}/Dockerfile` instead of
+  `validators/{name}/Dockerfile`. The internal `COPY validators` directives
+  also moved to `COPY validator_backends`.
+
+### Notes for downstream consumers
+
+Sibling Validibot repos that referenced this project — `validibot/`,
+`validibot-cloud/`, `validibot-cli/`, `validibot-project/`,
+`validibot-marketing/`, `validibot-shared/` — were updated in coordinated
+commits. Self-hosted operators using `validibot-validator-*` image names in
+their own dispatch code or orchestration must rename to
+`validibot-validator-backend-*`.
+
 ## [0.5.0] - 2026-04-18
 
 ### Added
@@ -22,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Backend selection is factory-driven off the `DEPLOYMENT_TARGET` environment
   variable, matching the Django side (`validibot/core/api/task_auth.py`). See
-  [ADR-2026-04-18](https://github.com/mcquilleninteractive/validibot-project/blob/main/docs/adr/2026-04-18-worker-endpoint-auth-platform-agnostic.md).
+  [ADR-2026-04-18](https://github.com/mcquilleninteractive/validibot-project/blob/main/docs/adr/completed/2026-04-18-worker-endpoint-auth-platform-agnostic.md).
 
 - **New environment variables** (validator Cloud Run Jobs):
   - `DEPLOYMENT_TARGET` — required; `just deploy` now passes `gcp` automatically.

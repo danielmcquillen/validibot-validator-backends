@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from validators.fmu import runner
+from validator_backends.fmu import runner
 from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUInputs, FMUOutputs
 from validibot_shared.validations.envelopes import (
     ExecutionContext,
@@ -48,7 +48,7 @@ def test_feedthrough_fmu_echoes_input_x86(monkeypatch, tmp_path) -> None:
     def _fake_download(uri: str, dest: Path) -> None:
         shutil.copy(Path(uri), dest)
 
-    monkeypatch.setattr("validators.fmu.runner.download_file", _fake_download)
+    monkeypatch.setattr("validator_backends.fmu.runner.download_file", _fake_download)
 
     envelope = FMUInputEnvelope(
         run_id="test-run",
@@ -94,7 +94,7 @@ def test_feedthrough_fmu_echoes_input_arm64(monkeypatch, tmp_path) -> None:
     def _fake_download(uri: str, dest: Path) -> None:
         shutil.copy(Path(uri), dest)
 
-    monkeypatch.setattr("validators.fmu.runner.download_file", _fake_download)
+    monkeypatch.setattr("validator_backends.fmu.runner.download_file", _fake_download)
 
     envelope = FMUInputEnvelope(
         run_id="test-run",

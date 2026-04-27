@@ -1,16 +1,16 @@
 <div align="center">
 
-# Validibot Advanced Validators
+# Validibot Validator Backends
 
-**Advanced validator containers for the Validibot data validation platform**
+**Containerized validator backends for the Validibot data validation platform**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 
-[Available Advanced Validators](#available-validators) •
+[Available Validator Backends](#available-validator-backends) •
 [Quick Start](#quick-start) •
-[Creating Custom Advanced Validators](#creating-a-custom-validator) •
+[Creating Custom Validator Backends](#creating-a-custom-validator-backend) •
 [Deployment](#deployment)
 
 </div>
@@ -30,21 +30,25 @@ This repository is one component of the Validibot open-source data validation pl
 | ----------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | **[validibot](https://github.com/danielmcquillen/validibot)**                                   | Core platform — web UI, REST API, workflow engine |
 | **[validibot-cli](https://github.com/danielmcquillen/validibot-cli)**                           | Command-line interface                            |
-| **[validibot-validators](https://github.com/danielmcquillen/validibot-validators)** (this repo) | Advanced validator containers                     |
+| **[validibot-validator-backends](https://github.com/danielmcquillen/validibot-validator-backends)** (this repo) | Validator backends for advanced validators        |
 | **[validibot-shared](https://github.com/danielmcquillen/validibot-shared)**                     | Shared Pydantic models for data interchange       |
 
-## What are Validibot Advanced Validators?
+## What are Validibot Validator Backends?
 
-Validibot "Advanced Validators" are Docker containers that perform specialized, resource-intensive data validations within the Validibot app. Unlike Validibot's built-in "simple" validators (JSON Schema, XML Schema, etc.) that run directly in the Django process, advanced validators:
+Validibot validator backends are the external implementations used by specialized, resource-intensive validators. In the core `validibot` codebase, an `AdvancedValidator` is the Django-side wrapper that prepares the run, builds the envelope, launches external work through an `ExecutionBackend`, and processes the output. This repository contains the validator backends that wrapper launches.
+
+The repository is named `validibot-validator-backends` to reflect that these are backend implementations invoked by the core platform's `AdvancedValidator` wrapper. If the concept becomes a formal core protocol or registry entry, `ValidatorBackend` is the right code-level name.
+
+Unlike Validibot's built-in "simple" validators (JSON Schema, XML Schema, etc.) that run directly in the Django process, validator backends:
 
 - **Run in isolation** — Each advanced validation runs in its own container with resource limits
 - **Have complex dependencies** — [EnergyPlus™](https://energyplus.net/), FMPy, and other domain-specific tools
 - **Are secure by default** — Network isolation, memory limits, and automatic cleanup
 - **Scale independently** — Can run on separate infrastructure from the core platform
 
-The core Validibot platform triggers these containers, passes input via the standardized envelope format (defined in [validibot-shared](https://github.com/danielmcquillen/validibot-shared)), and processes the results when complete.
+The core Validibot platform triggers these backends, passes input via the standardized envelope format (defined in [validibot-shared](https://github.com/danielmcquillen/validibot-shared)), and processes the results when complete.
 
-## Available Advanced Validators
+## Available Validator Backends
 
 | Validator      | Description                                    | Use Cases                                                        |
 | -------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
@@ -53,13 +57,13 @@ The core Validibot platform triggers these containers, passes input via the stan
 
 ## How It Works
 
-Advaned validators receive work via a standardized "envelope" containing:
+Validator backends receive work via a standardized "envelope" containing:
 
 - **Input files** — URIs to files being validated (GCS or local filesystem)
 - **Configuration** — Validator-specific settings (e.g., simulation timestep)
 - **Context** — Callback URL, execution bundle location, timeout settings
 
-After running validation, the container writes an output envelope with:
+After running validation, the backend writes an output envelope with:
 
 - **Status** — success, failure, or error
 - **Messages** — Validation findings (errors, warnings, info)
@@ -90,8 +94,8 @@ After running validation, the container writes an output envelope with:
 
 ```bash
 # Clone the repository
-git clone https://github.com/danielmcquillen/validibot-validators.git
-cd validibot-validators
+git clone https://github.com/danielmcquillen/validibot-validator-backends.git
+cd validibot-validator-backends
 
 # Build a specific validator
 just build energyplus
@@ -111,7 +115,7 @@ just --list
 > To ensure the new version is installed, use `--no-cache`:
 >
 > ```bash
-> docker buildx build --no-cache -f validators/energyplus/Dockerfile -t validibot-validator-energyplus:latest .
+> docker buildx build --no-cache -f validator_backends/energyplus/Dockerfile -t validibot-validator-backend-energyplus:latest .
 > ```
 >
 > Signs that cached layers are being used: build output shows `CACHED` for the pip install step, and your changes don't take effect at runtime.
@@ -131,18 +135,18 @@ just test-validator energyplus
 
 ## Deployment Modes
 
-Advanced validators support two deployment modes:
+Validator backends support two deployment modes:
 
 ### Self-Hosted (Docker)
 
-For self-hosted Validibot deployments, advanced validators run as local Docker containers:
+For self-hosted Validibot deployments, validator backends run as local Docker containers:
 
 ```bash
 # Build the container
 just build energyplus
 
 # The image will be available as:
-# validibot-validator-energyplus:latest
+# validibot-validator-backend-energyplus:latest
 ```
 
 The core platform's Celery worker manages container lifecycle:
@@ -161,7 +165,7 @@ Django Worker → Docker API → Validator Container → Local Storage
 
 ### Cloud Deployment (Container Registry)
 
-For cloud deployments, advanced validators run as container jobs (e.g., Cloud Run Jobs, Kubernetes Jobs):
+For cloud deployments, validator backends run as container jobs (e.g., Cloud Run Jobs, Kubernetes Jobs):
 
 ```bash
 # Set your GCP project (see "Container Registry Setup" below)
@@ -188,7 +192,7 @@ Cloud Run Service → Cloud Tasks → Cloud Run Job → GCS Storage
 
 ## Container Registry Setup
 
-To build and push validator containers, you need access to a container registry that Validibot can pull from at runtime.
+To build and push containerized validator backends, you need access to a container registry that Validibot can pull from at runtime.
 
 ### Supported Registries
 
@@ -236,7 +240,7 @@ See [justfile.local.example](justfile.local.example) for more configuration opti
 
 ### Environment Variables
 
-Advanced validators receive configuration via environment variables:
+Validator backends receive configuration via environment variables:
 
 | Variable                         | Required          | Description                                                                                                                                     |
 | -------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -250,9 +254,9 @@ Advanced validators receive configuration via environment variables:
 ### Callback Authentication
 
 Validator containers POST completion callbacks back to the Django
-worker service. The HTTP layer in `validators/core/callback_client.py`
+worker service. The HTTP layer in `validator_backends/core/callback_client.py`
 is deployment-target agnostic — authentication headers are produced
-by a pluggable backend in `validators/core/callback_auth.py`:
+by a pluggable backend in `validator_backends/core/callback_auth.py`:
 
 | Deployment | Backend                     | Header sent                                                                   |
 | ---------- | --------------------------- | ----------------------------------------------------------------------------- |
@@ -265,12 +269,12 @@ startup and caches the backend for the container's lifetime, so the
 google-auth transport's connection pool is reused across callbacks.
 
 See
-[ADR-2026-04-18: Platform-Agnostic Worker Endpoint Authentication](https://github.com/mcquilleninteractive/validibot-project/blob/main/docs/adr/2026-04-18-worker-endpoint-auth-platform-agnostic.md)
+[ADR-2026-04-18: Platform-Agnostic Worker Endpoint Authentication](https://github.com/mcquilleninteractive/validibot-project/blob/main/docs/adr/completed/2026-04-18-worker-endpoint-auth-platform-agnostic.md)
 for the full cross-repo architecture.
 
 ### Storage URIs
 
-Advanced validators support two storage backends:
+Validator backends support two storage backends:
 
 ```
 # Google Cloud Storage (GCP deployments)
@@ -282,7 +286,7 @@ file:///app/storage/private/runs/org-123/run-456/input.json
 
 ### Django Configuration
 
-Configure the core platform to use Docker-based advanced validators:
+Configure the core platform to use Docker-based validator backends:
 
 ```python
 # settings/local.py or settings/production.py
@@ -298,10 +302,10 @@ VALIDATOR_RUNNER_OPTIONS = {
 ## Directory Structure
 
 ```
-validibot-validators/
+validibot-validator-backends/
 ├── justfile                   # Build/deploy commands
 ├── pyproject.toml            # Python project config
-└── validators/
+└── validator_backends/
     ├── core/                 # Shared utilities
     │   ├── storage_client.py     # Storage I/O (gs:// and file://)
     │   ├── callback_client.py    # HTTP callback transport (retry, timeout)
@@ -323,25 +327,25 @@ validibot-validators/
         └── tests/
 ```
 
-## Creating a Custom Validator
+## Creating a Custom Validator Backend
 
-You can create custom advanced validators for domain-specific validation needs.
+You can create custom validator backends for domain-specific validation needs.
 
 ### 1. Create Validator Directory
 
 ```bash
-cp -r validators/energyplus validators/myvalidator
+cp -r validator_backends/energyplus validator_backends/myvalidator
 ```
 
 ### 2. Define Metadata
 
-Edit `validators/myvalidator/__metadata__.py`:
+Edit `validator_backends/myvalidator/__metadata__.py`:
 
 ```python
 METADATA = {
     "validator_type": "MYVALIDATOR",
     "validator_name": "My Custom Validator",
-    "image_name": "validibot-validator-myvalidator",
+    "image_name": "validibot-validator-backend-myvalidator",
     "supported_input_types": ["application/json"],
     "resource_requirements": {
         "memory": "2g",
@@ -383,7 +387,7 @@ class MyValidatorOutputEnvelope(ValidationOutputEnvelope):
 
 ### 4. Implement Runner
 
-Edit `validators/myvalidator/runner.py`:
+Edit `validator_backends/myvalidator/runner.py`:
 
 ```python
 from validibot_shared.myvalidator.envelopes import (
@@ -427,7 +431,7 @@ def run_validation(envelope: MyValidatorInputEnvelope) -> MyValidatorOutputEnvel
 
 ### 5. Update Dockerfile
 
-Edit `validators/myvalidator/Dockerfile` to install your dependencies:
+Edit `validator_backends/myvalidator/Dockerfile` to install your dependencies:
 
 ```dockerfile
 FROM python:3.13-slim
@@ -440,7 +444,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     your-tool \
     && rm -rf /var/lib/apt/lists/*
 
-COPY validators/myvalidator/requirements.txt .
+COPY validator_backends/myvalidator/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create non-root user BEFORE copying code so --chown works.
@@ -449,11 +453,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN groupadd --gid 1000 validibot \
     && useradd --uid 1000 --gid 1000 --no-create-home validibot
 
-COPY --chown=validibot:validibot validators /app/validators
+COPY --chown=validibot:validibot validator_backends /app/validator_backends
 
 USER validibot
 
-CMD ["python", "-m", "validators.myvalidator.main"]
+CMD ["python", "-m", "validator_backends.myvalidator.main"]
 ```
 
 ### 6. Build and Test
@@ -468,7 +472,7 @@ just test-validator myvalidator
 
 ## Validator Contract
 
-Every validator container must follow this contract:
+Every validator backend must follow this contract:
 
 1. **Read input location** from `VALIDIBOT_INPUT_URI` environment variable
 2. **Load input envelope** from storage using typed Pydantic model
@@ -478,7 +482,7 @@ Every validator container must follow this contract:
 6. **Upload output envelope** to storage
 7. **POST callback** (GCP mode only) or exit (self-hosted mode)
 
-The `validators.core` module provides helpers for steps 2, 5, 6, and 7.
+The `validator_backends.core` module provides helpers for steps 2, 5, 6, and 7.
 
 ### How It Fits Together
 
@@ -498,23 +502,23 @@ The `validators.core` module provides helpers for steps 2, 5, 6, and 7.
 │            Triggers Docker containers for advanced validations              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
-         ┌──────────────────────────┼──────────────────────────┐
-         ▼                          ▼                          ▼
-┌─────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
-│ validibot-cli   │    │ validibot-validators│    │ validibot-shared    │
-│                 │    │   (this repo)       │    │                     │
-│ Terminal access │    │                     │    │ Pydantic models     │
-│ to API          │    │ EnergyPlus™, FMU    │    │ (shared contract)   │
-│                 │    │ containers          │    │                     │
-└─────────────────┘    └─────────────────────┘    └─────────────────────┘
+         ┌─────────────────────────────┼─────────────────────────────┐
+         ▼                             ▼                             ▼
+┌─────────────────┐    ┌────────────────────────────┐    ┌─────────────────────┐
+│ validibot-cli   │    │ validibot-validator-       │    │ validibot-shared    │
+│                 │    │   backends (this repo)     │    │                     │
+│ Terminal access │    │                            │    │ Pydantic models     │
+│ to API          │    │ EnergyPlus™, FMU           │    │ (shared contract)   │
+│                 │    │ containers                 │    │                     │
+└─────────────────┘    └────────────────────────────┘    └─────────────────────┘
 ```
 
 ## Development
 
 ```bash
 # Clone the repository
-git clone https://github.com/danielmcquillen/validibot-validators.git
-cd validibot-validators
+git clone https://github.com/danielmcquillen/validibot-validator-backends.git
+cd validibot-validator-backends
 
 # Install dependencies
 uv sync --extra dev --extra fmu
@@ -523,7 +527,7 @@ uv sync --extra dev --extra fmu
 uv run ruff check .
 
 # Run type checker
-uv run mypy validators/
+uv run mypy validator_backends/
 
 # Run tests
 uv run --extra fmu pytest
@@ -550,6 +554,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 [Validibot Platform](https://github.com/danielmcquillen/validibot) •
 [Documentation](https://docs.validibot.com) •
-[Report Issues](https://github.com/danielmcquillen/validibot-validators/issues)
+[Report Issues](https://github.com/danielmcquillen/validibot-validator-backends/issues)
 
 </div>

@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import pytest
 
-from validators.core import callback_auth
-from validators.core.callback_auth import (
+from validator_backends.core import callback_auth
+from validator_backends.core.callback_auth import (
     CallbackAuth,
     GCPCallbackAuth,
     NullCallbackAuth,

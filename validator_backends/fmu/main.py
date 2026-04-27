@@ -12,10 +12,10 @@ import sys
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from validators.core.callback_client import post_callback
-from validators.core.envelope_loader import get_output_uri, load_input_envelope
-from validators.core.error_reporting import report_fatal
-from validators.core.gcs_client import upload_directory, upload_envelope
+from validator_backends.core.callback_client import post_callback
+from validator_backends.core.envelope_loader import get_output_uri, load_input_envelope
+from validator_backends.core.error_reporting import report_fatal
+from validator_backends.core.gcs_client import upload_directory, upload_envelope
 from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUOutputEnvelope
 from validibot_shared.validations.envelopes import (
     RawOutputs,

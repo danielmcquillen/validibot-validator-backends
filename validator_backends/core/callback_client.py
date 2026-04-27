@@ -3,7 +3,7 @@ HTTP callback client for validator containers.
 
 Provides utilities for POSTing validation completion callbacks back to
 the Django worker service. Authentication is delegated to a pluggable
-:mod:`validators.core.callback_auth` backend so the transport code
+:mod:`validator_backends.core.callback_auth` backend so the transport code
 stays deployment-target agnostic.
 """
 
@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 
-from validators.core.callback_auth import CallbackAuth, get_callback_auth
+from validator_backends.core.callback_auth import CallbackAuth, get_callback_auth
 from validibot_shared.validations.envelopes import ValidationCallback, ValidationStatus
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from validators.fmu import runner
+from validator_backends.fmu import runner
 
 
 def test_collect_output_values_prefers_result_fields() -> None:

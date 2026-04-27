@@ -20,7 +20,7 @@
 #   the main validibot justfile (../validibot/justfile) which has equivalent
 #   commands. Both work - use whichever is more convenient:
 #
-#     From validibot-validators/:  just deploy energyplus dev
+#     From validibot-validator-backends/:  just deploy energyplus dev
 #     From validibot/:      just validator-deploy energyplus dev
 #
 # =============================================================================
@@ -68,7 +68,7 @@ test *args:
 
 # Run tests for a specific validator
 test-validator validator:
-    uv run --extra dev --extra fmu pytest validators/{{validator}}/tests
+    uv run --extra dev --extra fmu pytest validator_backends/{{validator}}/tests
 
 # Lint all code
 lint:
@@ -94,18 +94,18 @@ check: lint test
 # =============================================================================
 
 # Build a validator container locally (for testing only)
-# Build context is the repo root (validibot-validators/), not the validator subdirectory
+# Build context is the repo root (validibot-validator-backends/), not the validator subdirectory
 # Builds for linux/amd64 since Cloud Run requires that architecture
 build validator:
     @echo "Building {{validator}} container..."
     docker buildx build \
         --platform linux/amd64 \
         --load \
-        -f validators/{{validator}}/Dockerfile \
-        -t validibot-validator-{{validator}}:latest \
-        -t validibot-validator-{{validator}}:{{git_sha}} \
+        -f validator_backends/{{validator}}/Dockerfile \
+        -t validibot-validator-backend-{{validator}}:latest \
+        -t validibot-validator-backend-{{validator}}:{{git_sha}} \
         .
-    @echo "✓ Built validibot-validator-{{validator}}:{{git_sha}}"
+    @echo "✓ Built validibot-validator-backend-{{validator}}:{{git_sha}}"
 
 # Build all validator containers
 build-all:
@@ -141,11 +141,11 @@ build-push validator:
     docker buildx build \
         --platform linux/amd64 \
         --push \
-        -f validators/{{validator}}/Dockerfile \
-        -t {{ar_repo}}/validibot-validator-{{validator}}:latest \
-        -t {{ar_repo}}/validibot-validator-{{validator}}:{{git_sha}} \
+        -f validator_backends/{{validator}}/Dockerfile \
+        -t {{ar_repo}}/validibot-validator-backend-{{validator}}:latest \
+        -t {{ar_repo}}/validibot-validator-backend-{{validator}}:{{git_sha}} \
         .
-    echo "✓ Built and pushed {{ar_repo}}/validibot-validator-{{validator}}:{{git_sha}}"
+    echo "✓ Built and pushed {{ar_repo}}/validibot-validator-backend-{{validator}}:{{git_sha}}"
 
 # Build and push all validators
 build-push-all:
@@ -172,16 +172,16 @@ deploy validator stage: (build-push validator)
 
     # Compute stage-specific names
     if [ "{{stage}}" = "prod" ]; then
-        JOB_NAME="validibot-validator-{{validator}}"
+        JOB_NAME="validibot-validator-backend-{{validator}}"
         SA="validibot-cloudrun-prod@{{gcp_project}}.iam.gserviceaccount.com"
     else
-        JOB_NAME="validibot-validator-{{validator}}-{{stage}}"
+        JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
         SA="validibot-cloudrun-{{stage}}@{{gcp_project}}.iam.gserviceaccount.com"
     fi
 
     echo "Deploying $JOB_NAME to {{stage}}..."
     gcloud run jobs deploy "$JOB_NAME" \
-        --image {{ar_repo}}/validibot-validator-{{validator}}:{{git_sha}} \
+        --image {{ar_repo}}/validibot-validator-backend-{{validator}}:{{git_sha}} \
         --region {{gcp_region}} \
         --project {{gcp_project}} \
         --service-account "$SA" \
@@ -228,9 +228,9 @@ list-jobs:
 describe-job validator stage="prod":
     #!/usr/bin/env bash
     if [ "{{stage}}" = "prod" ]; then
-        JOB_NAME="validibot-validator-{{validator}}"
+        JOB_NAME="validibot-validator-backend-{{validator}}"
     else
-        JOB_NAME="validibot-validator-{{validator}}-{{stage}}"
+        JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
     fi
     gcloud run jobs describe "$JOB_NAME" \
         --region {{gcp_region}} \
@@ -240,9 +240,9 @@ describe-job validator stage="prod":
 logs validator stage="prod" lines="100":
     #!/usr/bin/env bash
     if [ "{{stage}}" = "prod" ]; then
-        JOB_NAME="validibot-validator-{{validator}}"
+        JOB_NAME="validibot-validator-backend-{{validator}}"
     else
-        JOB_NAME="validibot-validator-{{validator}}-{{stage}}"
+        JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
     fi
     gcloud logging read \
         "resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"$JOB_NAME\"" \
@@ -254,9 +254,9 @@ logs validator stage="prod" lines="100":
 delete-job validator stage="prod":
     #!/usr/bin/env bash
     if [ "{{stage}}" = "prod" ]; then
-        JOB_NAME="validibot-validator-{{validator}}"
+        JOB_NAME="validibot-validator-backend-{{validator}}"
     else
-        JOB_NAME="validibot-validator-{{validator}}-{{stage}}"
+        JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
     fi
     echo "Deleting Cloud Run Job $JOB_NAME..."
     gcloud run jobs delete "$JOB_NAME" \
@@ -275,13 +275,13 @@ run-local validator input_uri:
         -e VALIDIBOT_INPUT_URI={{input_uri}} \
         -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/adc.json \
         -v "$HOME/.config/gcloud/application_default_credentials.json:/tmp/keys/adc.json:ro" \
-        validibot-validator-{{validator}}:latest
+        validibot-validator-backend-{{validator}}:latest
 
 # Shell into a validator container (for debugging)
 shell validator:
     docker run --rm -it \
         --entrypoint /bin/bash \
-        validibot-validator-{{validator}}:latest
+        validibot-validator-backend-{{validator}}:latest
 
 # =============================================================================
 # CI/CD Helpers

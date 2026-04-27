@@ -46,7 +46,7 @@ these practices:
 
 ## Scope
 
-This security policy covers the `validibot-validators` repository only. For
+This security policy covers the `validibot-validator-backends` repository only. For
 security issues in other Validibot components, see:
 
 - [validibot](https://github.com/danielmcquillen/validibot) (core platform)

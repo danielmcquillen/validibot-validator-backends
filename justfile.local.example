@@ -48,13 +48,13 @@ export VALIDIBOT_GCP_REGION="us-central1"
 # Examples of what the registry URL looks like:
 #
 # Google Artifact Registry:
-#   us-central1-docker.pkg.dev/my-project/validibot/validibot-validator-energyplus
+#   us-central1-docker.pkg.dev/my-project/validibot/validibot-validator-backend-energyplus
 #
 # Docker Hub:
-#   docker.io/myorg/validibot-validator-energyplus
+#   docker.io/myorg/validibot-validator-backend-energyplus
 #
 # GitHub Container Registry:
-#   ghcr.io/myorg/validibot-validator-energyplus
+#   ghcr.io/myorg/validibot-validator-backend-energyplus
 #
 # AWS ECR:
-#   123456789.dkr.ecr.us-east-1.amazonaws.com/validibot-validator-energyplus
+#   123456789.dkr.ecr.us-east-1.amazonaws.com/validibot-validator-backend-energyplus

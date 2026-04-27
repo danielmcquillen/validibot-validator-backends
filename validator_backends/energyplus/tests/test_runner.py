@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from validators.energyplus import runner
-from validators.energyplus.main import (
+from validator_backends.energyplus import runner
+from validator_backends.energyplus.main import (
     _infer_artifact_type,
     _rewrite_output_paths,
 )

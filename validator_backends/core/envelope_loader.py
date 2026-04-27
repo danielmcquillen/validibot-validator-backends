@@ -21,7 +21,7 @@ import sys
 
 from pydantic import BaseModel
 
-from validators.core.storage_client import download_envelope
+from validator_backends.core.storage_client import download_envelope
 
 
 logger = logging.getLogger(__name__)

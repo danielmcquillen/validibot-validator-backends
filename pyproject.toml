@@ -1,7 +1,7 @@
 # ==== Project metadata ====
 
 [project]
-name = "validibot-validators"
+name = "validibot-validator-backends"
 version = "0.5.0"
 description = "Validibot advanced validator containers (EnergyPlus, FMU)"
 readme = "README.md"
@@ -63,8 +63,8 @@ fmu = ["fmpy==0.3.27"]
 [project.urls]
 Homepage = "https://validibot.com"
 Documentation = "https://docs.validibot.com"
-Repository = "https://github.com/danielmcquillen/validibot-validators"
-Issues = "https://github.com/danielmcquillen/validibot-validators/issues"
+Repository = "https://github.com/danielmcquillen/validibot-validator-backends"
+Issues = "https://github.com/danielmcquillen/validibot-validator-backends/issues"
 
 [tool.uv.sources]
 # validibot-shared: Prefer the sibling checkout during coordinated local
@@ -81,16 +81,16 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["validators"]
+packages = ["validator_backends"]
 
 # ==== pytest ====
 
 [tool.pytest.ini_options]
 testpaths = [
     "tests",
-    "validators/energyplus/tests",
-    "validators/core/tests",
-    "validators/fmu/tests",
+    "validator_backends/energyplus/tests",
+    "validator_backends/core/tests",
+    "validator_backends/fmu/tests",
 ]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
@@ -105,7 +105,7 @@ filterwarnings = ["ignore::DeprecationWarning"]
 # ==== Coverage ====
 
 [tool.coverage.run]
-source = ["validators"]
+source = ["validator_backends"]
 omit = ["*/tests/*", "*/__pycache__/*"]
 
 [tool.coverage.report]
@@ -120,7 +120,7 @@ exclude_lines = [
 [tool.ruff]
 target-version = "py313"
 line-length = 99
-src = ["validators"]
+src = ["validator_backends"]
 
 [tool.ruff.lint]
 select = [
@@ -146,7 +146,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["validators", "validibot_shared"]
+known-first-party = ["validator_backends", "validibot_shared"]
 force-single-line = false
 lines-after-imports = 2
 

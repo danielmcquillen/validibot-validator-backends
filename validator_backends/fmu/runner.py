@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from fmpy import read_model_description, simulate_fmu
 
-from validators.core.gcs_client import download_file
+from validator_backends.core.gcs_client import download_file
 from validibot_shared.fmu.envelopes import FMUOutputs
 
 

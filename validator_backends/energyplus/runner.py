@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from validators.core.gcs_client import download_file
+from validator_backends.core.gcs_client import download_file
 from validibot_shared.energyplus.envelopes import EnergyPlusOutputs
 from validibot_shared.energyplus.models import (
     STDOUT_TAIL_CHARS,

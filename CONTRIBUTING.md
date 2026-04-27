@@ -1,7 +1,7 @@
 # Contributing to Validibot Validators
 
 Thank you for your interest in contributing! This document covers the process
-for contributing to `validibot-validators`.
+for contributing to `validibot-validator-backends`.
 
 ## License Agreement
 
@@ -57,7 +57,7 @@ formatting. Configuration is in [pyproject.toml](pyproject.toml). Run
 
 ## Reporting Issues
 
-- **Bugs and feature requests:** [GitHub Issues](https://github.com/danielmcquillen/validibot-validators/issues)
+- **Bugs and feature requests:** [GitHub Issues](https://github.com/danielmcquillen/validibot-validator-backends/issues)
 - **Security vulnerabilities:** See [SECURITY.md](SECURITY.md) — do not open a public issue
 
 ## Code of Conduct

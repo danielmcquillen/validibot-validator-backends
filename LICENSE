@@ -33,7 +33,7 @@ community contributions and make it easy to create, modify, and share validators
 | Repository | License | Rationale |
 |------------|---------|-----------|
 | **validibot** (core) | AGPL-3.0 / Commercial | The core platform contains the orchestration, API, and business logic. AGPL ensures improvements to the platform are shared back, while commercial licenses are available for proprietary use. |
-| **validibot-validators** (this repo) | MIT | Advanced validators are plugins that wrap third-party tools (EnergyPlus, FMU, etc.). MIT licensing reduces friction for contributors and users who want to write or modify validators. |
+| **validibot-validator-backends** (this repo) | MIT | Advanced validators are plugins that wrap third-party tools (EnergyPlus, FMU, etc.). MIT licensing reduces friction for contributors and users who want to write or modify validators. |
 
 ### What This Means For You
 

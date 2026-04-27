@@ -1,8 +1,8 @@
 """
-EnergyPlus Validator Metadata.
+FMU Validator Metadata.
 
-This module defines metadata about the EnergyPlus validator container,
-used by the container launcher to configure execution.
+This module defines metadata about the FMU (Functional Mock-up Unit)
+validator container, used by the container launcher to configure execution.
 
 The metadata is exposed at runtime so the orchestrator can query
 container capabilities without running a full validation.
@@ -12,16 +12,16 @@ from __future__ import annotations
 
 
 # Validator identification
-VALIDATOR_TYPE = "ENERGYPLUS"
-VALIDATOR_NAME = "EnergyPlus Simulation Validator"
+VALIDATOR_TYPE = "FMU"
+VALIDATOR_NAME = "FMU Simulation Validator"
 VALIDATOR_DESCRIPTION = (
-    "Runs EnergyPlus building energy simulations and extracts "
-    "performance metrics (energy use, temperatures, etc.)"
+    "Runs FMU (Functional Mock-up Unit) simulations using fmpy "
+    "and extracts output values for validation assertions."
 )
 
 # Container image naming (used by validibot to construct image name)
 # Full image name: {VALIDATOR_IMAGE_REGISTRY}/{IMAGE_NAME}:{tag}
-IMAGE_NAME = "validibot-validator-energyplus"
+IMAGE_NAME = "validibot-validator-backend-fmu"
 
 # Environment variables
 # These are the environment variables the container expects
@@ -42,18 +42,11 @@ ENV_VARS = {
 
 # Supported input file types (MIME types from validibot_shared.validations.envelopes)
 SUPPORTED_INPUT_TYPES = [
-    "application/vnd.energyplus.idf",  # IDF text format
-    "application/vnd.energyplus.epjson",  # epJSON format
+    "application/vnd.fmi.fmu",  # Functional Mock-up Unit
 ]
 
-# Required auxiliary files
-REQUIRED_AUXILIARY_FILES = [
-    {
-        "role": "weather",
-        "mime_type": "application/vnd.energyplus.epw",
-        "description": "EnergyPlus weather file (.epw)",
-    },
-]
+# Required auxiliary files (none - FMU is self-contained)
+REQUIRED_AUXILIARY_FILES = []
 
 # Resource requirements (defaults, can be overridden by orchestrator)
 RESOURCE_REQUIREMENTS = {

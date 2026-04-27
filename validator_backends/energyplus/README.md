@@ -152,7 +152,7 @@ just logs energyplus
 
 ```bash
 # Replace with your region and bucket
-gcloud run jobs execute validibot-validator-energyplus \
+gcloud run jobs execute validibot-validator-backend-energyplus \
   --region <your-region> \
   --update-env-vars VALIDIBOT_INPUT_URI=gs://<your-bucket>/test/input.json
 ```
