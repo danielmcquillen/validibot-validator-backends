@@ -1,11 +1,11 @@
 # Runtime dependencies
-pydantic==2.12.3
+pydantic==2.13.3
 httpx==0.28.1
-google-cloud-storage==3.9.0
-google-auth==2.48.0
+google-cloud-storage==3.10.1
+google-auth==2.50.0
 defusedxml==0.7.1
-fmpy==0.3.27
+fmpy==0.3.29
 
 # Validibot shared library (from PyPI)
 # Pin exact version to bust Docker layer cache on upgrades.
-validibot-shared==0.4.2
+validibot-shared==0.5.0
