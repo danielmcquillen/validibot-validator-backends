@@ -11,14 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Release workflow `.github/workflows/release.yml` (Trust ADR
   Phase 5 Session D). On a signed tag push, the workflow verifies
-  the tag signature, builds each backend image, pushes to Google
-  Artifact Registry, attaches a sigstore build-provenance
-  attestation to the image digest via
-  `actions/attest-build-provenance`, and uploads a per-backend
-  SPDX SBOM to the GitHub release page. Also embeds an
-  OCI-attached SBOM into the image manifest itself via BuildKit's
-  attestation API. Required CI configuration documented in the
-  new `RELEASING.md`.
+  the tag signature and builds each backend image (energyplus +
+  fmu) in parallel. Each image is published with full
+  supply-chain provenance:
+  - **GitHub Container Registry (default, free, public)** —
+    pushed to `ghcr.io/<owner>/validibot-validator-backend-<validator>:vX.Y.Z`.
+    Anyone running self-hosted Validibot can pull official
+    images without third-party registry credentials.
+  - **Google Artifact Registry (optional secondary mirror)** —
+    when the operator configures `GCP_PROJECT_ID`,
+    `GCP_REGION`, `GCP_GAR_REPOSITORY`,
+    `GCP_WORKLOAD_IDENTITY_PROVIDER`, and
+    `GCP_SERVICE_ACCOUNT_EMAIL`, the workflow mirrors the same
+    image digest to GAR via `crane copy`. Used by Validibot
+    cloud's deploy pipeline for latency / IAM reasons.
+  - `actions/attest-build-provenance` writes a sigstore-signed
+    attestation linking the image digest to this CI run.
+  - `docker/build-push-action` with `provenance: mode=max` +
+    `sbom: true` embeds a SPDX SBOM into the OCI image manifest
+    via BuildKit's attestation API.
+  - Per-backend SPDX SBOM uploaded to the GitHub release page.
+  Maintainer recipe documented in
+  `validibot-project/docs/operations/releasing/validibot-validator-backends.md`;
+  operator-facing verification recipe in `RELEASING.md`.
 - OpenSSF Scorecard workflow `.github/workflows/scorecard.yml`.
   Runs weekly + on push to `main`; publishes results to the public
   Scorecard dashboard. README badge added.

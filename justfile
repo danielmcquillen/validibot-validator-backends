@@ -304,3 +304,91 @@ verify-all:
         just build "$v"
     done
     echo "✓ All validators verified"
+
+# =============================================================================
+# Release
+# =============================================================================
+#
+# Cuts a signed-tag release. CI then verifies the signature, builds
+# each backend image with full supply-chain provenance (sigstore
+# attestation + SBOM), pushes to GHCR, and (when configured) mirrors
+# to GAR.
+#
+# Operator verification (after pull): see RELEASING.md.
+
+# Release a new version: signs the tag, pushes, CI builds + publishes.
+# Usage: just release 0.6.0
+release VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Validate version format.
+    if [[ ! "{{VERSION}}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "✗ Version must be in format X.Y.Z (e.g., 0.6.0). Got: {{VERSION}}"
+        exit 1
+    fi
+
+    # Refuse if working tree is dirty.
+    if [[ -n $(git status --porcelain) ]]; then
+        echo "✗ Working tree has uncommitted changes. Commit or stash first."
+        git status --short
+        exit 1
+    fi
+
+    # Refuse if not on main.
+    BRANCH=$(git branch --show-current)
+    if [[ "$BRANCH" != "main" ]]; then
+        echo "✗ Not on main branch (currently on '$BRANCH')."
+        echo "  Releases are cut from main only. Switch with: git checkout main"
+        exit 1
+    fi
+
+    # Refuse if tag already exists locally or remotely.
+    TAG="v{{VERSION}}"
+    if git rev-parse "$TAG" >/dev/null 2>&1; then
+        echo "✗ Tag $TAG already exists locally."
+        exit 1
+    fi
+    if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "$TAG"; then
+        echo "✗ Tag $TAG already exists on origin."
+        exit 1
+    fi
+
+    # Confirm we're up-to-date with origin.
+    git fetch origin main
+    if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+        echo "✗ Local main is not in sync with origin/main."
+        echo "  Run: git pull"
+        exit 1
+    fi
+
+    # Verify pyproject.toml version matches the requested release.
+    TOML_VERSION=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+    if [[ "$TOML_VERSION" != "{{VERSION}}" ]]; then
+        echo "✗ pyproject.toml version ($TOML_VERSION) doesn't match {{VERSION}}."
+        echo "  Bump the version in pyproject.toml first, commit, and push."
+        exit 1
+    fi
+
+    echo ""
+    echo "About to sign and push tag $TAG."
+    echo "CI will then build + push images for: {{validators}}"
+    echo "Press Enter to continue, Ctrl+C to abort..."
+    read -r
+
+    # Sign the tag. Requires `git config --global tag.gpgsign true`
+    # and a signing key configured. The CI workflow at
+    # .github/workflows/release.yml verifies the signature and
+    # publishes the release artefacts.
+    git tag -s "$TAG" -m "$TAG"
+    git push origin "$TAG"
+
+    echo ""
+    echo "✓ Pushed $TAG"
+    echo "  CI will:"
+    echo "    1. Verify the tag signature"
+    echo "    2. Build each backend image (in parallel)"
+    echo "    3. Push to GHCR with sigstore attestation"
+    echo "    4. (Optional) Mirror to GAR if GCP_PROJECT_ID is configured"
+    echo "    5. Attach SBOM to GitHub release"
+    echo "  Monitor: gh run watch"

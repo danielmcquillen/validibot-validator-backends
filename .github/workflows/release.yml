@@ -9,29 +9,58 @@
 #    ``VALIDATOR_BACKEND_IMAGE_POLICY=signed-digest`` against a
 #    deployment can then check the image was built by Validibot CI
 #    via ``gh attestation verify``.
-# 2. **SBOM (SPDX + CycloneDX)** — ``docker/build-push-action`` with
+# 2. **SBOM (SPDX)** — ``docker/build-push-action`` with
 #    ``sbom: true`` embeds a SPDX SBOM into the OCI image manifest
-#    via BuildKit's attestation API. The same SBOM is also extracted
-#    and attached to the GitHub Release for tools that prefer
-#    fetching SBOMs from a release page rather than the registry.
+#    via BuildKit's attestation API. The SBOM is also extracted and
+#    attached to the GitHub Release for tools that prefer fetching
+#    SBOMs from a release page rather than the registry.
 # 3. **Signed-tag verification** — the workflow refuses to build if
 #    the triggering tag is unsigned. Combined with branch protection,
 #    this means the only way to push a release image is from a
 #    maintainer's signed commit.
 #
-# Registry: pushes to Google Artifact Registry (GAR) authenticated
-# via Workload Identity Federation. Required repo secrets/vars:
+# Default registry: GitHub Container Registry (GHCR)
+# ===================================================
 #
-# - ``GCP_PROJECT_ID`` (variable) — destination project.
-# - ``GCP_REGION`` (variable) — GAR region (e.g. ``us-west1``).
-# - ``GCP_GAR_REPOSITORY`` (variable) — Artifact Registry repo name.
-# - ``GCP_WORKLOAD_IDENTITY_PROVIDER`` (secret) — WIF provider path.
-# - ``GCP_SERVICE_ACCOUNT_EMAIL`` (secret) — SA email with
-#   ``roles/artifactregistry.writer`` on the repo above.
+# Validibot's open-core promise is "free for everyone." Validator
+# backend images are part of that promise — anyone running self-hosted
+# community Validibot must be able to ``docker pull`` an official
+# image without paying for a third party's registry egress.
 #
-# When any of these is missing, the auth step fails fast with a
-# clear "Workload Identity Federation not configured" message — the
-# expected state for a fresh fork until the operator wires up GAR.
+# GHCR is free for public images, has no rate limit on anonymous
+# pulls of public artefacts, lives in the same GitHub org as the
+# repo, and authenticates via the ambient ``GITHUB_TOKEN`` — no
+# extra secrets required for the default path.
+#
+# Image references published per release:
+#
+#     ghcr.io/<owner>/validibot-validator-backend-<validator>:vX.Y.Z
+#     ghcr.io/<owner>/validibot-validator-backend-<validator>:latest
+#
+# Optional secondary push: Google Artifact Registry (GAR)
+# ========================================================
+#
+# Cloud (validibot.com) prefers running validator backend images out
+# of a private GAR repo for deploy-time reasons (latency to Cloud Run
+# Jobs, billing, IAM). When the operator configures the GAR variables
+# below, the workflow *also* pushes the same digest to GAR after the
+# GHCR push succeeds. The GHCR copy remains the public source of
+# truth; GAR is a deployment-channel mirror.
+#
+# Optional GAR configuration (when set, the secondary push fires;
+# when missing, the GHCR-only path is the whole release):
+#
+#   Variables:
+#     GCP_PROJECT_ID
+#     GCP_REGION
+#     GCP_GAR_REPOSITORY
+#   Secrets:
+#     GCP_WORKLOAD_IDENTITY_PROVIDER
+#     GCP_SERVICE_ACCOUNT_EMAIL
+#
+# When the GAR vars/secrets are unset, the workflow skips the GAR
+# step cleanly — the expected state for a fresh fork or a
+# community-only operator who doesn't need a private mirror.
 
 name: Release validator backend images
 
@@ -62,20 +91,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
 
-      # Trust ADR Phase 5 Session D — the workflow refuses to ship
-      # unsigned tags. The check fails when ``git verify-tag`` exits
-      # non-zero, which happens for unsigned tags or tags signed by
-      # a key not in the repo's allowed-signers config.
+      # Trust ADR Phase 5 Session D — refuse unsigned tags. The
+      # check fails when ``git verify-tag`` exits non-zero, which
+      # happens for unsigned tags or tags signed by a key not in
+      # the repo's allowed-signers config.
       #
-      # Why this is in CI rather than a branch protection rule:
-      # GitHub's branch protection covers commits but doesn't gate
-      # tag pushes. CI verification is the layer that catches
-      # ``git push --tags`` of an unsigned tag.
-      #
-      # ``TAG_REF`` is bound via env (rather than interpolated into
-      # the run script) — recommended practice even for fields
-      # GitHub controls, so a future refactor that switches the
-      # source can't accidentally introduce a shell-injection point.
+      # ``TAG_REF`` is bound via env (not interpolated into the
+      # script body) — recommended practice for any input from a
+      # GitHub event payload.
       - name: Verify tag is signed
         env:
           TAG_REF: ${{ inputs.tag || github.ref_name }}
@@ -83,7 +106,7 @@ jobs:
           if ! git verify-tag "$TAG_REF" 2>&1; then
             echo "::error::Tag '$TAG_REF' is not signed."
             echo "Sign with: git tag -s '$TAG_REF' -m 'release notes'"
-            echo "See RELEASING.md for the full release recipe."
+            echo "Or use the maintainer recipe: just release X.Y.Z"
             exit 1
           fi
           echo "Tag '$TAG_REF' signature verified."
@@ -100,54 +123,50 @@ jobs:
         validator: [energyplus, fmu]
 
     permissions:
-      # Required for OIDC token exchange (both GCP auth AND the
-      # build-provenance attestation step).
+      # Required for OIDC token exchange (used by GHCR push, GCP
+      # WIF auth, AND the build-provenance attestation step).
       id-token: write
       # Required for ``actions/attest-build-provenance`` to write
       # attestations to the repo's transparency log.
       attestations: write
       # Required for the SBOM upload step at the end.
       contents: write
-      # Required for ``docker/build-push-action`` to write package
-      # metadata (SBOM provenance) when pushing to GHCR — harmless
-      # for GAR.
+      # Required to push images to GHCR.
       packages: write
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Authenticate to Google Cloud (Workload Identity Federation)
-        id: gcp-auth
-        uses: google-github-actions/auth@b7593ed2efd1c1617e1b0254da33b86225adb2a5  # v3.0.0
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Configure Docker for Artifact Registry
-        env:
-          GCP_REGION: ${{ vars.GCP_REGION }}
-        run: |
-          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435  # v3.11.1
 
-      - name: Compute image reference
+      # ── Primary registry: GHCR (always pushed) ────────────────────
+      #
+      # GHCR auth uses the ambient GITHUB_TOKEN — no operator-
+      # provided secret needed. The repo-owner namespace is derived
+      # from ``github.repository_owner`` so forks publish under
+      # their own namespace automatically.
+      - name: Log in to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772  # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image references
         id: image-ref
         env:
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_GAR_REPOSITORY: ${{ vars.GCP_GAR_REPOSITORY }}
+          OWNER: ${{ github.repository_owner }}
           VALIDATOR: ${{ matrix.validator }}
           TAG_REF: ${{ inputs.tag || github.ref_name }}
         run: |
-          REGISTRY="${GCP_REGION}-docker.pkg.dev"
-          REPO="${REGISTRY}/${GCP_PROJECT_ID}/${GCP_GAR_REPOSITORY}"
-          IMAGE="${REPO}/validibot-validator-backend-${VALIDATOR}"
+          # GHCR namespace requires lower-case owner; normalise.
+          OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          GHCR_IMAGE="ghcr.io/${OWNER_LC}/validibot-validator-backend-${VALIDATOR}"
           {
-            echo "image=${IMAGE}"
+            echo "ghcr_image=${GHCR_IMAGE}"
             echo "tag=${TAG_REF}"
-            echo "full_ref=${IMAGE}:${TAG_REF}"
+            echo "ghcr_full_ref=${GHCR_IMAGE}:${TAG_REF}"
           } >> "$GITHUB_OUTPUT"
 
       # Trust ADR Phase 5 Session D — single build that emits the
@@ -155,8 +174,8 @@ jobs:
       # ``attest-build-provenance`` (next step) layers the
       # sigstore-signed attestation on top of the digest this step
       # outputs.
-      - name: Build and push image with SBOM
-        id: build-push
+      - name: Build and push to GHCR with SBOM
+        id: build-push-ghcr
         uses: docker/build-push-action@a5c81be0a96e4a9bc25ae9c9db1d2bf78008f366  # v6.21.1
         with:
           context: .
@@ -164,8 +183,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ steps.image-ref.outputs.full_ref }}
-            ${{ steps.image-ref.outputs.image }}:latest
+            ${{ steps.image-ref.outputs.ghcr_full_ref }}
+            ${{ steps.image-ref.outputs.ghcr_image }}:latest
           # SLSA build provenance and SBOM as image-attached
           # attestations — verifiers running
           # ``cosign verify-attestation`` can pull both from the
@@ -173,21 +192,72 @@ jobs:
           provenance: mode=max
           sbom: true
 
-      - name: Generate sigstore attestation for image digest
+      - name: Generate sigstore attestation for GHCR image digest
         uses: actions/attest-build-provenance@dc6d213b0024d5bf1f2f5c9d49ea7fe0c2ff2c7e  # v3.1.1
         with:
-          subject-name: ${{ steps.image-ref.outputs.image }}
-          subject-digest: ${{ steps.build-push.outputs.digest }}
+          subject-name: ${{ steps.image-ref.outputs.ghcr_image }}
+          subject-digest: ${{ steps.build-push-ghcr.outputs.digest }}
           push-to-registry: true
 
-      # Extract the SBOM from the image manifest so it can be
-      # attached to the GitHub release page in addition to riding
-      # along inside the OCI image. Operators and auditors who don't
-      # have registry access can still pull the SBOM from the
-      # release.
+      # ── Optional secondary registry: Google Artifact Registry ─────
+      #
+      # When the operator has set the GAR variables and secrets, the
+      # workflow also publishes the same image digest to a private
+      # GAR repo (e.g. for cloud's deploy-time pulls). The
+      # ``actions/attest-build-provenance`` already wrote the
+      # sigstore attestation against the GHCR digest, but since the
+      # image bytes are identical (same build, same digest) the same
+      # attestation verifies for the GAR copy too.
+      #
+      # The ``if: vars.GCP_PROJECT_ID != ''`` gate makes this step a
+      # no-op for forks / community operators who only want the GHCR
+      # path.
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: vars.GCP_PROJECT_ID != ''
+        id: gcp-auth
+        uses: google-github-actions/auth@b7593ed2efd1c1617e1b0254da33b86225adb2a5  # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Configure Docker for Artifact Registry
+        if: vars.GCP_PROJECT_ID != ''
+        env:
+          GCP_REGION: ${{ vars.GCP_REGION }}
+        run: |
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Mirror image from GHCR to GAR
+        if: vars.GCP_PROJECT_ID != ''
+        env:
+          GHCR_IMAGE: ${{ steps.image-ref.outputs.ghcr_image }}
+          GHCR_DIGEST: ${{ steps.build-push-ghcr.outputs.digest }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_GAR_REPOSITORY: ${{ vars.GCP_GAR_REPOSITORY }}
+          VALIDATOR: ${{ matrix.validator }}
+          TAG_REF: ${{ inputs.tag || github.ref_name }}
+        run: |
+          GAR_REGISTRY="${GCP_REGION}-docker.pkg.dev"
+          GAR_IMAGE="${GAR_REGISTRY}/${GCP_PROJECT_ID}/${GCP_GAR_REPOSITORY}/validibot-validator-backend-${VALIDATOR}"
+          # ``crane`` copies the image manifest + layers verbatim,
+          # preserving the digest. Re-pushing via ``docker push``
+          # would rebuild and the digest would drift; crane is the
+          # right tool for "same bytes, different registry."
+          curl -sSfL https://github.com/google/go-containerregistry/releases/download/v0.20.6/go-containerregistry_Linux_x86_64.tar.gz \
+            | tar -xz -C /usr/local/bin crane
+          crane copy \
+            "${GHCR_IMAGE}@${GHCR_DIGEST}" \
+            "${GAR_IMAGE}:${TAG_REF}"
+          crane copy \
+            "${GHCR_IMAGE}@${GHCR_DIGEST}" \
+            "${GAR_IMAGE}:latest"
+
+      # ── SBOM extraction + release page upload (always runs) ───────
+
       - name: Extract SBOM from image
         env:
-          IMAGE_REF: ${{ steps.image-ref.outputs.full_ref }}
+          IMAGE_REF: ${{ steps.image-ref.outputs.ghcr_full_ref }}
           VALIDATOR: ${{ matrix.validator }}
         run: |
           docker buildx imagetools inspect "$IMAGE_REF" \
@@ -201,9 +271,6 @@ jobs:
           path: validibot-validator-backend-${{ matrix.validator }}.spdx.json
           retention-days: 90
 
-      # ``RELEASE_TAG`` is bound via env (rather than interpolated
-      # into the run script) — recommended practice for any input
-      # derived from a GitHub event payload.
       - name: Attach SBOM to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
