@@ -96,6 +96,21 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
 
+      # Configure git so ``git verify-tag`` knows where the
+      # repo's allowed-signers file lives. Without this step,
+      # ``git verify-tag`` fails with "gpg.ssh.allowedSignersFile
+      # needs to be configured" because git defaults to GPG
+      # signature verification on a fresh CI runner.
+      - name: Configure git for SSH signature verification
+        run: |
+          if [ -f .allowed_signers ]; then
+            git config gpg.ssh.allowedSignersFile "$PWD/.allowed_signers"
+            git config gpg.format ssh
+          else
+            echo "::error::Repo is missing .allowed_signers; cannot verify signed tags."
+            exit 1
+          fi
+
       # Trust ADR Phase 5 Session D — refuse unsigned tags. The
       # check fails when ``git verify-tag`` exits non-zero, which
       # happens for unsigned tags or tags signed by a key not in
