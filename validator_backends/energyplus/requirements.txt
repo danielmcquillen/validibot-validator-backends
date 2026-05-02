@@ -6,4 +6,4 @@ google-auth==2.50.0
 
 # Validibot shared library (from PyPI)
 # Pin exact version to bust Docker layer cache on upgrades.
-validibot-shared==0.5.1
+validibot-shared==0.6.0
