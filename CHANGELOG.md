@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump `validibot-shared` 0.6.0 → 0.7.0. Trust ADR Phase 5 Session A
+  added an optional ``StepValidatorRecord.validator_backend_image_digest``
+  field on the producer-side evidence manifest schema. The validator
+  backends don't use the new field (they only touch
+  ``validibot_shared.{validations,fmu,energyplus}.envelopes``), but
+  this repo keeps validibot-shared in lockstep with the validibot
+  producer so cross-repo tooling sees a single version. Container
+  images must be rebuilt to bake in the new wheel.
+
 ### Changed (BREAKING)
 
 - **Repository renamed** from `validibot-validators` to
