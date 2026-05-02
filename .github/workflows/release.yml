@@ -79,10 +79,15 @@ permissions:
 
 jobs:
   verify-signed-tag:
-    name: Verify tag signature
+    name: Verify tag signature and create release
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # ``contents: write`` lets us create the GitHub release that
+      # the parallel matrix jobs below will attach SBOMs to. Doing
+      # this once here (before the matrix) avoids the race
+      # condition that would happen if each matrix job tried to
+      # create the release in parallel.
+      contents: write
 
     steps:
       - name: Checkout (full history for tag verification)
@@ -110,6 +115,22 @@ jobs:
             exit 1
           fi
           echo "Tag '$TAG_REF' signature verified."
+
+      # Create the GitHub release here (idempotent) so the
+      # parallel matrix jobs can ``gh release upload`` SBOM files
+      # without having to coordinate creation.
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_TAG" \
+              --generate-notes \
+              --verify-tag
+          fi
 
   build-and-publish:
     name: Build, sign, and push ${{ matrix.validator }}

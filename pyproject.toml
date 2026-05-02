@@ -2,7 +2,7 @@
 
 [project]
 name = "validibot-validator-backends"
-version = "0.5.0"
+version = "0.6.0"
 description = "Validibot advanced validator containers (EnergyPlus, FMU)"
 readme = "README.md"
 requires-python = ">=3.13"
