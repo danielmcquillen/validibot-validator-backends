@@ -48,7 +48,7 @@ dependencies = [
     # but we keep validibot-shared in lockstep with the validibot
     # producer so downstream tooling that pulls dependency
     # signatures across repos sees a single version.
-    "validibot-shared==0.7.0",
+    "validibot-shared==0.7.3",
 ]
 
 [project.optional-dependencies]
