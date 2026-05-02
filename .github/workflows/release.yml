@@ -291,14 +291,27 @@ jobs:
 
       # ── SBOM extraction + release page upload (always runs) ───────
 
-      - name: Extract SBOM from image
-        env:
-          IMAGE_REF: ${{ steps.image-ref.outputs.ghcr_full_ref }}
-          VALIDATOR: ${{ matrix.validator }}
-        run: |
-          docker buildx imagetools inspect "$IMAGE_REF" \
-            --format '{{ json (index .SBOM "linux/amd64").SPDX }}' \
-            > "validibot-validator-backend-${VALIDATOR}.spdx.json"
+      # Generate a SPDX SBOM from the published image. Earlier
+      # iterations of this workflow tried to extract the SBOM that
+      # ``docker/build-push-action`` attaches to the OCI image
+      # manifest (via ``sbom: true``), but ``docker buildx imagetools
+      # inspect``'s ``--format`` template syntax for SBOM access is
+      # unstable across buildx versions. ``anchore/sbom-action`` runs
+      # Syft against the image and produces a clean SPDX file —
+      # purpose-built for this and stable across buildx changes.
+      #
+      # The OCI-attached SBOM (from ``sbom: true`` on the build-push
+      # step) is still present in the image manifest; this step
+      # just produces a *separate* convenience file for the GitHub
+      # release page that doesn't require operators to query the
+      # registry.
+      - name: Generate SPDX SBOM from image
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
+        with:
+          image: ${{ steps.image-ref.outputs.ghcr_full_ref }}
+          format: spdx-json
+          output-file: validibot-validator-backend-${{ matrix.validator }}.spdx.json
+          upload-artifact: false  # Our own upload-artifact step below handles this.
 
       - name: Upload SBOM as workflow artifact
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
