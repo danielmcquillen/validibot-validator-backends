@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Release workflow `.github/workflows/release.yml` (Trust ADR
+  Phase 5 Session D). On a signed tag push, the workflow verifies
+  the tag signature, builds each backend image, pushes to Google
+  Artifact Registry, attaches a sigstore build-provenance
+  attestation to the image digest via
+  `actions/attest-build-provenance`, and uploads a per-backend
+  SPDX SBOM to the GitHub release page. Also embeds an
+  OCI-attached SBOM into the image manifest itself via BuildKit's
+  attestation API. Required CI configuration documented in the
+  new `RELEASING.md`.
+- OpenSSF Scorecard workflow `.github/workflows/scorecard.yml`.
+  Runs weekly + on push to `main`; publishes results to the public
+  Scorecard dashboard. README badge added.
+- `RELEASING.md` documenting the maintainer release recipe (sign
+  tag → push → CI verifies + publishes) and the operator
+  verification recipe (`gh attestation verify oci://<image>@<digest>`).
+
 ### Changed
 
 - Bump `validibot-shared` 0.6.0 → 0.7.0. Trust ADR Phase 5 Session A

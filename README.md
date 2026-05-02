@@ -5,6 +5,7 @@
 **Containerized validator backends for the Validibot data validation platform**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/danielmcquillen/validibot-validator-backends/badge)](https://scorecard.dev/viewer/?uri=github.com/danielmcquillen/validibot-validator-backends)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 

@@ -1,0 +1,64 @@
+# Trust ADR Phase 5 Session D — OpenSSF Scorecard health checks.
+#
+# Scorecard inspects this repo's open-source security hygiene
+# and publishes a score to the public OSSF Scorecard dashboard.
+# The README embeds a badge linking to the dashboard.
+#
+# This is a sibling workflow to ``validibot/.github/workflows/scorecard.yml``;
+# they're separate files because the two repos have independent
+# release cadences and Scorecard scores. The shape is identical —
+# see that file's docstring for the rationale.
+#
+# Why this matters specifically for the validator backends repo:
+# the Docker images this repo publishes are what end up running
+# user-submitted data inside customer deployments. Operators
+# evaluating "should I trust this image?" look at the repo's
+# Scorecard score as one input, alongside the SBOM and the OIDC
+# build provenance that the release workflow attaches.
+
+name: Scorecard supply-chain security
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: '0 2 * * 0'  # 02:00 UTC every Sunday
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@f49aabe0b5af0936a0987cfb85d86b75731b0186  # v2.4.1
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload Scorecard artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@e296a935590eb16afc0c0108289f68c87e2a89a5  # v4.31.7
+        with:
+          sarif_file: results.sarif

@@ -1,0 +1,216 @@
+# Trust ADR Phase 5 Session D — Release workflow for validator backends.
+#
+# On a signed-tag push (``v*``), build each validator backend image
+# with full supply-chain provenance:
+#
+# 1. **OIDC build attestation** — ``actions/attest-build-provenance``
+#    produces a sigstore-style attestation linking the image digest
+#    to *this exact* GitHub Actions run. Verifiers running
+#    ``VALIDATOR_BACKEND_IMAGE_POLICY=signed-digest`` against a
+#    deployment can then check the image was built by Validibot CI
+#    via ``gh attestation verify``.
+# 2. **SBOM (SPDX + CycloneDX)** — ``docker/build-push-action`` with
+#    ``sbom: true`` embeds a SPDX SBOM into the OCI image manifest
+#    via BuildKit's attestation API. The same SBOM is also extracted
+#    and attached to the GitHub Release for tools that prefer
+#    fetching SBOMs from a release page rather than the registry.
+# 3. **Signed-tag verification** — the workflow refuses to build if
+#    the triggering tag is unsigned. Combined with branch protection,
+#    this means the only way to push a release image is from a
+#    maintainer's signed commit.
+#
+# Registry: pushes to Google Artifact Registry (GAR) authenticated
+# via Workload Identity Federation. Required repo secrets/vars:
+#
+# - ``GCP_PROJECT_ID`` (variable) — destination project.
+# - ``GCP_REGION`` (variable) — GAR region (e.g. ``us-west1``).
+# - ``GCP_GAR_REPOSITORY`` (variable) — Artifact Registry repo name.
+# - ``GCP_WORKLOAD_IDENTITY_PROVIDER`` (secret) — WIF provider path.
+# - ``GCP_SERVICE_ACCOUNT_EMAIL`` (secret) — SA email with
+#   ``roles/artifactregistry.writer`` on the repo above.
+#
+# When any of these is missing, the auth step fails fast with a
+# clear "Workload Identity Federation not configured" message — the
+# expected state for a fresh fork until the operator wires up GAR.
+
+name: Release validator backend images
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-signed-tag:
+    name: Verify tag signature
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout (full history for tag verification)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+
+      # Trust ADR Phase 5 Session D — the workflow refuses to ship
+      # unsigned tags. The check fails when ``git verify-tag`` exits
+      # non-zero, which happens for unsigned tags or tags signed by
+      # a key not in the repo's allowed-signers config.
+      #
+      # Why this is in CI rather than a branch protection rule:
+      # GitHub's branch protection covers commits but doesn't gate
+      # tag pushes. CI verification is the layer that catches
+      # ``git push --tags`` of an unsigned tag.
+      #
+      # ``TAG_REF`` is bound via env (rather than interpolated into
+      # the run script) — recommended practice even for fields
+      # GitHub controls, so a future refactor that switches the
+      # source can't accidentally introduce a shell-injection point.
+      - name: Verify tag is signed
+        env:
+          TAG_REF: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if ! git verify-tag "$TAG_REF" 2>&1; then
+            echo "::error::Tag '$TAG_REF' is not signed."
+            echo "Sign with: git tag -s '$TAG_REF' -m 'release notes'"
+            echo "See RELEASING.md for the full release recipe."
+            exit 1
+          fi
+          echo "Tag '$TAG_REF' signature verified."
+
+  build-and-publish:
+    name: Build, sign, and push ${{ matrix.validator }}
+    needs: verify-signed-tag
+    runs-on: ubuntu-latest
+    strategy:
+      # Don't cancel sibling matrix jobs when one fails — operators
+      # debugging a release want to see all the failure modes at once.
+      fail-fast: false
+      matrix:
+        validator: [energyplus, fmu]
+
+    permissions:
+      # Required for OIDC token exchange (both GCP auth AND the
+      # build-provenance attestation step).
+      id-token: write
+      # Required for ``actions/attest-build-provenance`` to write
+      # attestations to the repo's transparency log.
+      attestations: write
+      # Required for the SBOM upload step at the end.
+      contents: write
+      # Required for ``docker/build-push-action`` to write package
+      # metadata (SBOM provenance) when pushing to GHCR — harmless
+      # for GAR.
+      packages: write
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        id: gcp-auth
+        uses: google-github-actions/auth@b7593ed2efd1c1617e1b0254da33b86225adb2a5  # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Configure Docker for Artifact Registry
+        env:
+          GCP_REGION: ${{ vars.GCP_REGION }}
+        run: |
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435  # v3.11.1
+
+      - name: Compute image reference
+        id: image-ref
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_GAR_REPOSITORY: ${{ vars.GCP_GAR_REPOSITORY }}
+          VALIDATOR: ${{ matrix.validator }}
+          TAG_REF: ${{ inputs.tag || github.ref_name }}
+        run: |
+          REGISTRY="${GCP_REGION}-docker.pkg.dev"
+          REPO="${REGISTRY}/${GCP_PROJECT_ID}/${GCP_GAR_REPOSITORY}"
+          IMAGE="${REPO}/validibot-validator-backend-${VALIDATOR}"
+          {
+            echo "image=${IMAGE}"
+            echo "tag=${TAG_REF}"
+            echo "full_ref=${IMAGE}:${TAG_REF}"
+          } >> "$GITHUB_OUTPUT"
+
+      # Trust ADR Phase 5 Session D — single build that emits the
+      # image, an OCI-attached SBOM (SPDX), and BuildKit provenance.
+      # ``attest-build-provenance`` (next step) layers the
+      # sigstore-signed attestation on top of the digest this step
+      # outputs.
+      - name: Build and push image with SBOM
+        id: build-push
+        uses: docker/build-push-action@a5c81be0a96e4a9bc25ae9c9db1d2bf78008f366  # v6.21.1
+        with:
+          context: .
+          file: validator_backends/${{ matrix.validator }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.image-ref.outputs.full_ref }}
+            ${{ steps.image-ref.outputs.image }}:latest
+          # SLSA build provenance and SBOM as image-attached
+          # attestations — verifiers running
+          # ``cosign verify-attestation`` can pull both from the
+          # registry alongside the image digest.
+          provenance: mode=max
+          sbom: true
+
+      - name: Generate sigstore attestation for image digest
+        uses: actions/attest-build-provenance@dc6d213b0024d5bf1f2f5c9d49ea7fe0c2ff2c7e  # v3.1.1
+        with:
+          subject-name: ${{ steps.image-ref.outputs.image }}
+          subject-digest: ${{ steps.build-push.outputs.digest }}
+          push-to-registry: true
+
+      # Extract the SBOM from the image manifest so it can be
+      # attached to the GitHub release page in addition to riding
+      # along inside the OCI image. Operators and auditors who don't
+      # have registry access can still pull the SBOM from the
+      # release.
+      - name: Extract SBOM from image
+        env:
+          IMAGE_REF: ${{ steps.image-ref.outputs.full_ref }}
+          VALIDATOR: ${{ matrix.validator }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE_REF" \
+            --format '{{ json (index .SBOM "linux/amd64").SPDX }}' \
+            > "validibot-validator-backend-${VALIDATOR}.spdx.json"
+
+      - name: Upload SBOM as workflow artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+        with:
+          name: sbom-${{ matrix.validator }}
+          path: validibot-validator-backend-${{ matrix.validator }}.spdx.json
+          retention-days: 90
+
+      # ``RELEASE_TAG`` is bound via env (rather than interpolated
+      # into the run script) — recommended practice for any input
+      # derived from a GitHub event payload.
+      - name: Attach SBOM to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          VALIDATOR: ${{ matrix.validator }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "validibot-validator-backend-${VALIDATOR}.spdx.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
