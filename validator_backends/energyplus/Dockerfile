@@ -53,8 +53,12 @@ ENV PATH="/opt/energyplus:${PATH}"
 # Set working directory
 WORKDIR /app
 
-# Add /app to PYTHONPATH so imports like "from validator_backends.core.x" work
-ENV PYTHONPATH="/app:${PYTHONPATH}"
+# Add /app to PYTHONPATH so imports like "from validator_backends.core.x" work.
+# We set PYTHONPATH=/app rather than /app:${PYTHONPATH} because the base
+# image doesn't define PYTHONPATH; referencing the undefined var triggers
+# BuildKit's UndefinedVar lint warning. The validator container needs
+# nothing else on PYTHONPATH, so a fixed value is correct.
+ENV PYTHONPATH=/app
 
 # Copy requirements first (for layer caching)
 COPY validator_backends/energyplus/requirements.txt .

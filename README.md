@@ -74,7 +74,7 @@ After running validation, the backend writes an output envelope with:
 ## Important Disclaimers
 
 > [!CAUTION]
-> **Code execution:** Validator containers execute user-supplied files (IDF building models, FMU binaries, etc.) using third-party tools. While containers provide isolation, no guarantee is made regarding safety, security, or resource consumption. You are responsible for reviewing files before running them.
+> **Code execution:** Validator backend containers execute user-supplied files (IDF building models, FMU binaries, etc.) using third-party tools. While containers provide isolation, no guarantee is made regarding safety, security, or resource consumption. You are responsible for reviewing files before running them.
 >
 > **Cloud costs:** Cloud deployments (GCP Cloud Run, etc.) incur charges for compute, storage, and network. The authors are not liable for any costs incurred.
 >
@@ -153,7 +153,7 @@ just build energyplus
 The core platform's Celery worker manages container lifecycle:
 
 ```
-Django Worker → Docker API → Validator Container → Local Storage
+Django Worker → Docker API → Validator Backend Container → Local Storage
      ↑                                                    │
      └────────────── Reads output.json ───────────────────┘
 ```
@@ -254,7 +254,7 @@ Validator backends receive configuration via environment variables:
 
 ### Callback Authentication
 
-Validator containers POST completion callbacks back to the Django
+Validator backend containers POST completion callbacks back to the Django
 worker service. The HTTP layer in `validator_backends/core/callback_client.py`
 is deployment-target agnostic — authentication headers are produced
 by a pluggable backend in `validator_backends/core/callback_auth.py`:
