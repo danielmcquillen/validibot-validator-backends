@@ -33,6 +33,25 @@ RUN wget -q https://github.com/NREL/EnergyPlus/releases/download/v25.2.0/EnergyP
 # =============================================================================
 FROM python:3.13-slim
 
+# Backend wrapper version. This is OUR backend's version — bump it when the
+# wrapper code, image layout, or output semantics change. It is INTENTIONALLY
+# decoupled from the bundled EnergyPlus binary's upstream version (currently
+# 25.2.0, downloaded above) — the upstream library can stay pinned while we
+# iterate on the wrapper, and vice versa.
+#
+# Build-arg override is supported for release-engineering edge cases:
+#   docker build --build-arg VALIDATOR_BACKEND_VERSION=0.1.1-rc1 ...
+ARG VALIDATOR_BACKEND_VERSION="0.1.0"
+ARG VALIDATOR_BACKEND_REVISION="unknown"
+ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
+ARG VALIDATOR_BACKEND_SLUG="energyplus"
+
+LABEL org.opencontainers.image.title="Validibot EnergyPlus validator backend" \
+      org.opencontainers.image.version="${VALIDATOR_BACKEND_VERSION}" \
+      org.opencontainers.image.revision="${VALIDATOR_BACKEND_REVISION}" \
+      org.opencontainers.image.source="${VALIDATOR_BACKEND_SOURCE}" \
+      io.validibot.validator-backend.slug="${VALIDATOR_BACKEND_SLUG}"
+
 # Install runtime dependencies
 # - libgomp1: OpenMP runtime for parallel processing
 # - libx11-6, libxext6: X11 libs required by EnergyPlus binary

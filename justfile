@@ -97,15 +97,26 @@ check: lint test
 # Build context is the repo root (validibot-validator-backends/), not the validator subdirectory
 # Builds for linux/amd64 since Cloud Run requires that architecture
 build validator:
-    @echo "Building {{validator}} container..."
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building {{validator}} container..."
+    # The backend image version comes from the Dockerfile's
+    # ``ARG VALIDATOR_BACKEND_VERSION`` default — that's the single source of
+    # truth. Release engineering can override via the env var
+    # (``VALIDATOR_BACKEND_VERSION=0.1.1-rc1 just build energyplus``); the
+    # ``${VAR:+--build-arg ...}`` form passes the build-arg only when the
+    # env var is set and otherwise lets the Dockerfile default win.
     docker buildx build \
         --platform linux/amd64 \
         --load \
         -f validator_backends/{{validator}}/Dockerfile \
+        ${VALIDATOR_BACKEND_VERSION:+--build-arg VALIDATOR_BACKEND_VERSION="${VALIDATOR_BACKEND_VERSION}"} \
+        --build-arg VALIDATOR_BACKEND_REVISION="{{git_sha}}" \
+        --build-arg VALIDATOR_BACKEND_SLUG="{{validator}}" \
         -t validibot-validator-backend-{{validator}}:latest \
         -t validibot-validator-backend-{{validator}}:{{git_sha}} \
         .
-    @echo "✓ Built validibot-validator-backend-{{validator}}:{{git_sha}}"
+    echo "✓ Built validibot-validator-backend-{{validator}}:{{git_sha}}"
 
 # Build all validator containers
 build-all:
@@ -138,10 +149,16 @@ build-push validator:
         exit 1
     fi
     echo "Building and pushing {{validator}} container..."
+    # See ``build`` recipe for the version-handling rationale: Dockerfile
+    # default is canonical; env-var override is opt-in for release
+    # engineering.
     docker buildx build \
         --platform linux/amd64 \
         --push \
         -f validator_backends/{{validator}}/Dockerfile \
+        ${VALIDATOR_BACKEND_VERSION:+--build-arg VALIDATOR_BACKEND_VERSION="${VALIDATOR_BACKEND_VERSION}"} \
+        --build-arg VALIDATOR_BACKEND_REVISION="{{git_sha}}" \
+        --build-arg VALIDATOR_BACKEND_SLUG="{{validator}}" \
         -t {{ar_repo}}/validibot-validator-backend-{{validator}}:latest \
         -t {{ar_repo}}/validibot-validator-backend-{{validator}}:{{git_sha}} \
         .
@@ -189,8 +206,8 @@ deploy validator stage: (build-push validator)
         --cpu 2 \
         --max-retries 0 \
         --task-timeout 3600 \
-        --set-env-vars "PYTHONUNBUFFERED=1,VALIDATOR_VERSION={{git_sha}},VALIDIBOT_STAGE={{stage}},DEPLOYMENT_TARGET=gcp" \
-        --labels "validator={{validator}},version={{git_sha}},stage={{stage}}"
+        --set-env-vars "PYTHONUNBUFFERED=1,VALIDIBOT_STAGE={{stage}},DEPLOYMENT_TARGET=gcp" \
+        --labels "validator={{validator}},revision={{git_sha}},stage={{stage}}"
     echo "✓ $JOB_NAME deployed"
 
     # Grant the service account permission to run this job with overrides

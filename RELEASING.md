@@ -28,6 +28,86 @@ Each release publishes both `:vX.Y.Z` (immutable, recommended for
 production) and `:latest` (mutable convenience pointer for
 development).
 
+## How image versions are set
+
+The Docker containers do not read `VALIDATOR_VERSION` or
+`VALIDATOR_BACKEND_VERSION` at runtime. The version is **image metadata
+only** — baked into the OCI labels at build time from the Dockerfile's
+`ARG VALIDATOR_BACKEND_VERSION` default:
+
+- `org.opencontainers.image.version` ← `ARG VALIDATOR_BACKEND_VERSION`
+  (the Dockerfile default)
+- `org.opencontainers.image.revision` ← the commit SHA used for the
+  build (passed in by the recipe)
+- `io.validibot.validator-backend.slug` identifies which backend the
+  image implements (`energyplus`, `fmu`, …)
+
+There's no Python-side `BACKEND_IMAGE_VERSION` constant and no separate
+version file. The Dockerfile is the single source of truth.
+
+### Wrapper version vs bundled-library version
+
+`VALIDATOR_BACKEND_VERSION` is **OUR backend wrapper's version** — the
+container image, the entrypoint, the envelope handling. It is
+*intentionally decoupled* from the upstream library version that the
+wrapper bundles (e.g. EnergyPlus 25.2.0 inside the EnergyPlus backend
+container).
+
+A fresh release ships these values:
+
+| Backend | Wrapper version | Bundled library |
+|---|---|---|
+| EnergyPlus | `0.1.0` (Dockerfile default) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
+| FMU | `0.1.0` (Dockerfile default) | fmpy (pinned in `requirements.txt`) |
+
+Bumping the wrapper version does NOT imply bumping the bundled library,
+and vice versa. They iterate independently.
+
+### Bumping a backend's version
+
+Edit the Dockerfile's `ARG` default — that's the only change required:
+
+```dockerfile
+# validator_backends/fmu/Dockerfile
+ARG VALIDATOR_BACKEND_VERSION="0.1.1"   # was "0.1.0"
+```
+
+The next `just build fmu` (or `just build-push fmu`) stamps the new
+version onto the image. Different backends can have different version
+labels in the same repo release; they're independent files.
+
+### Manual builds
+
+If you build manually instead of using the just recipes, pass the
+build-arg only when overriding the Dockerfile default — release-engineering
+edge cases like RC builds:
+
+```bash
+# Use the Dockerfile default (the canonical version):
+docker buildx build \
+  --platform linux/amd64 \
+  --load \
+  -f validator_backends/fmu/Dockerfile \
+  --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
+  --build-arg VALIDATOR_BACKEND_SLUG=fmu \
+  -t validibot-validator-backend-fmu:0.1.0 \
+  .
+
+# Stamp an RC version instead:
+docker buildx build \
+  --platform linux/amd64 \
+  --load \
+  -f validator_backends/fmu/Dockerfile \
+  --build-arg VALIDATOR_BACKEND_VERSION=0.1.1-rc1 \
+  --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
+  --build-arg VALIDATOR_BACKEND_SLUG=fmu \
+  -t validibot-validator-backend-fmu:0.1.1-rc1 \
+  .
+```
+
+The image digest remains the exact trust root for a run; the version
+label is for inventory and support readability.
+
 ## Two layers of provenance
 
 Each release ships:

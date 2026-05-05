@@ -108,6 +108,112 @@ just build-all
 just --list
 ```
 
+### Image version metadata
+
+Each backend's Dockerfile is the **single source of truth** for that
+backend's version. The `ARG VALIDATOR_BACKEND_VERSION` default is what gets
+stamped onto the built image as the `org.opencontainers.image.version` OCI
+label — and that's the only place the version lives. Specifically:
+
+- **Not in a Python constant.** No `BACKEND_IMAGE_VERSION` in
+  `__metadata__.py` to drift from the Dockerfile.
+- **Not in a runtime environment variable.** The container doesn't read its
+  own version from its environment at startup; the version belongs to the
+  image's identity, not the runtime caller's configuration.
+- **Not in a sidecar version file.** No `VERSION` text file to keep in sync.
+
+The trust-critical runtime identity is still the image **digest**
+(`sha256:...`). The version label is for operator inventory (the
+`just self-hosted validators` recipe reads it via `docker inspect`),
+support, and release readability — not for cryptographic verification.
+
+```dockerfile
+# validator_backends/energyplus/Dockerfile
+ARG VALIDATOR_BACKEND_VERSION="0.1.0"
+LABEL org.opencontainers.image.version="${VALIDATOR_BACKEND_VERSION}" ...
+```
+
+The `just build <validator>` and `just build-push <validator>` recipes
+honour this default and additionally stamp:
+
+- `org.opencontainers.image.revision` = current git commit SHA
+- `org.opencontainers.image.source` = this repository
+- `io.validibot.validator-backend.slug` = the backend slug
+  (`energyplus`, `fmu`, …)
+
+Each backend has its own version. EnergyPlus can move to `0.1.1` while FMU
+stays on `0.1.0` — they're independent files.
+
+#### Wrapper version vs bundled-library version (CRUCIAL)
+
+`VALIDATOR_BACKEND_VERSION` is **OUR backend wrapper's version** — the
+container image, the entrypoint, the envelope handling. It is *intentionally
+decoupled* from the upstream library version that the wrapper bundles.
+
+Concretely, a fresh `validator_backends/energyplus/Dockerfile` ships with:
+
+| Axis | Value | Bumped when |
+|---|---|---|
+| Wrapper version (`VALIDATOR_BACKEND_VERSION`) | `0.1.0` | Wrapper code, image layout, or output semantics change |
+| Bundled EnergyPlus binary | `25.2.0` | A newer EnergyPlus release is downloaded |
+
+These are independent:
+
+- The wrapper can iterate (0.1.0 → 0.2.0 → 0.3.0) while still bundling
+  EnergyPlus 25.2.0.
+- The bundled EnergyPlus version can be upgraded without bumping the
+  wrapper version (though usually you'd bump both because output
+  semantics may shift).
+
+Bumping `VALIDATOR_BACKEND_VERSION` does NOT imply bumping the bundled
+library version. Bumping the bundled library does NOT imply bumping
+`VALIDATOR_BACKEND_VERSION` (though it usually warrants one).
+
+#### Inspecting a built image
+
+```bash
+docker image inspect validibot-validator-backend-energyplus:latest \
+  --format '{{ index .Config.Labels "org.opencontainers.image.version" }}'
+# → 0.1.0
+
+docker image inspect validibot-validator-backend-energyplus:latest \
+  --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
+# → abc1234
+```
+
+#### Override for release engineering
+
+Release engineering can override the Dockerfile default at build time
+without editing source — useful for RC builds and one-off provenance:
+
+```bash
+# Manual build using the Dockerfile default (0.1.0):
+docker buildx build \
+  --platform linux/amd64 --load \
+  -f validator_backends/energyplus/Dockerfile \
+  --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
+  --build-arg VALIDATOR_BACKEND_SLUG=energyplus \
+  -t validibot-validator-backend-energyplus:0.1.0 \
+  .
+
+# Same build but stamping a release-candidate version:
+VALIDATOR_BACKEND_VERSION=0.1.1-rc1 just build energyplus
+
+# Or directly:
+docker buildx build \
+  --platform linux/amd64 --load \
+  -f validator_backends/energyplus/Dockerfile \
+  --build-arg VALIDATOR_BACKEND_VERSION=0.1.1-rc1 \
+  --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
+  --build-arg VALIDATOR_BACKEND_SLUG=energyplus \
+  -t validibot-validator-backend-energyplus:0.1.1-rc1 \
+  .
+```
+
+The `${VAR:+--build-arg ...}` form in the just recipes only passes the
+build-arg when `VALIDATOR_BACKEND_VERSION` is set in the environment;
+otherwise the Dockerfile default wins.
+
 > [!IMPORTANT]
 > **After updating dependencies (especially `validibot-shared`):**
 >
@@ -343,6 +449,11 @@ cp -r validator_backends/energyplus validator_backends/myvalidator
 Edit `validator_backends/myvalidator/__metadata__.py`:
 
 ```python
+# Note: the backend image version lives in the Dockerfile's
+# ``ARG VALIDATOR_BACKEND_VERSION`` default — see step 3 below.
+# Don't redeclare it here (no ``BACKEND_IMAGE_VERSION`` constant) —
+# the Dockerfile is the single source of truth.
+
 METADATA = {
     "validator_type": "MYVALIDATOR",
     "validator_name": "My Custom Validator",
@@ -358,6 +469,29 @@ METADATA = {
 def get_metadata():
     return METADATA
 ```
+
+### 3. Bake the Wrapper Version into the Dockerfile
+
+Edit `validator_backends/myvalidator/Dockerfile`:
+
+```dockerfile
+# OUR backend wrapper version. Bump when the wrapper code changes.
+# This is independent of any upstream library version the wrapper bundles.
+ARG VALIDATOR_BACKEND_VERSION="0.1.0"
+ARG VALIDATOR_BACKEND_REVISION="unknown"
+ARG VALIDATOR_BACKEND_SOURCE="https://github.com/your-org/your-validator-backends"
+ARG VALIDATOR_BACKEND_SLUG="myvalidator"
+
+LABEL org.opencontainers.image.title="My Custom Validator backend" \
+      org.opencontainers.image.version="${VALIDATOR_BACKEND_VERSION}" \
+      org.opencontainers.image.revision="${VALIDATOR_BACKEND_REVISION}" \
+      org.opencontainers.image.source="${VALIDATOR_BACKEND_SOURCE}" \
+      io.validibot.validator-backend.slug="${VALIDATOR_BACKEND_SLUG}"
+```
+
+The build will stamp `0.1.0` (or whatever you set) onto the resulting image
+as an OCI label, where `docker inspect` and the
+`just self-hosted validators` operator inventory recipe can read it back.
 
 ### 3. Create Typed Envelopes
 

@@ -23,6 +23,14 @@ VALIDATOR_DESCRIPTION = (
 # Full image name: {VALIDATOR_IMAGE_REGISTRY}/{IMAGE_NAME}:{tag}
 IMAGE_NAME = "validibot-validator-backend-energyplus"
 
+# NOTE: backend image version lives in the Dockerfile's
+# ``ARG VALIDATOR_BACKEND_VERSION`` default, not here. The Dockerfile is
+# the single source of truth — the build stamps the version onto the
+# image as the ``org.opencontainers.image.version`` OCI label, and
+# ``docker inspect`` reads it back. There is no Python-side version
+# constant because nothing in the runtime needs one (validibot identifies
+# validator backends by image digest, not by name+version).
+
 # Environment variables
 # These are the environment variables the container expects
 ENV_VARS = {
