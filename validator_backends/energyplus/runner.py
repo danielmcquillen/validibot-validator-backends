@@ -392,6 +392,15 @@ def _extract_metrics(sql_path: Path | None) -> EnergyPlusSimulationMetrics:
         metrics.heating_energy_kwh = heating_gj * _GJ_TO_KWH
     if cooling_gj >= 0:
         metrics.cooling_energy_kwh = cooling_gj * _GJ_TO_KWH
+    # Populate the simulation-derived conditioned area from the
+    # building_area we already computed for EUI. Per ADR-2026-05-22,
+    # the simulation-derived value lives in o.* (here); IDF-text-
+    # derived facts (which may include a design floor area input)
+    # live in i.* (parser path). The shared field is named
+    # ``simulated_conditioned_area_m2`` since shared 0.8.0 to make
+    # the "simulated, not declared" semantics explicit.
+    if building_area > 0:
+        metrics.simulated_conditioned_area_m2 = building_area
     if window_heat_gain is not None:
         metrics.window_heat_gain_kwh = window_heat_gain
     if window_heat_loss is not None:
