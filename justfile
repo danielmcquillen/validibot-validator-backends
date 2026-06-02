@@ -49,7 +49,7 @@ ar_repo := ar_host + "/" + gcp_project + "/validibot"
 git_sha := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
 
 # Available validators
-validators := "energyplus fmu"
+validators := "energyplus fmu shacl"
 
 # =============================================================================
 # Default - List Commands
@@ -64,11 +64,11 @@ validators := "energyplus fmu"
 
 # Run all tests
 test *args:
-    uv run --extra dev --extra fmu pytest {{args}}
+    uv run --extra dev --extra fmu --extra shacl pytest {{args}}
 
 # Run tests for a specific validator
 test-validator validator:
-    uv run --extra dev --extra fmu pytest validator_backends/{{validator}}/tests
+    uv run --extra dev --extra fmu --extra shacl pytest validator_backends/{{validator}}/tests
 
 # Lint all code
 lint:

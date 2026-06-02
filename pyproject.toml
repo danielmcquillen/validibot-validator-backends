@@ -2,8 +2,8 @@
 
 [project]
 name = "validibot-validator-backends"
-version = "0.6.0"
-description = "Validibot advanced validator containers (EnergyPlus, FMU)"
+version = "0.7.0"
+description = "Validibot advanced validator containers (EnergyPlus, FMU, SHACL)"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
@@ -17,6 +17,8 @@ keywords = [
     "energyplus",
     "fmi",
     "fmu",
+    "shacl",
+    "rdf",
     "simulation",
     "building-energy",
 ]
@@ -48,7 +50,7 @@ dependencies = [
     # but we keep validibot-shared in lockstep with the validibot
     # producer so downstream tooling that pulls dependency
     # signatures across repos sees a single version.
-    "validibot-shared==0.8.0",
+    "validibot-shared==0.9.0",
 ]
 
 [project.optional-dependencies]
@@ -67,6 +69,16 @@ energyplus = [
 
 # FMU validator dependencies (for local dev/testing)
 fmu = ["fmpy==0.3.29"]
+
+# SHACL validator dependencies (for local dev/testing). Pinned to match the
+# community validibot repo so behaviour is identical across the boundary.
+shacl = [
+    "rdflib==7.6.0",
+    "pyshacl==0.31.0",
+    "owlrl==7.1.4",
+    "defusedxml==0.7.1",
+    "lxml==6.1.1",
+]
 
 [project.urls]
 Homepage = "https://validibot.com"
@@ -99,6 +111,7 @@ testpaths = [
     "validator_backends/energyplus/tests",
     "validator_backends/core/tests",
     "validator_backends/fmu/tests",
+    "validator_backends/shacl/tests",
 ]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
