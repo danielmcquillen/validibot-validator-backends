@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-06
+
+### Changed
+
+- SHACL backend pySHACL timeout defaults raised to match the producer side:
+  `DEFAULT_PYSHACL_TIMEOUT_SECONDS` 30 → 300 and
+  `HARD_MAX_PYSHACL_TIMEOUT_SECONDS` 120 → 1800 (`shacl/engine.py`). These now
+  mirror Django's `_DEFAULT_PYSHACL_TIMEOUT` / `_HARD_MAX_PYSHACL_TIMEOUT`
+  (`validations/.../shacl/launch.py`) and the `validibot-shared`
+  `SHACLInputs.pyshacl_timeout_seconds` envelope default. The previous 30s/120s
+  caps were a backstop sized before real building models were tested; a graph
+  near the 1M-triple cap can legitimately take minutes, so the old caps caused
+  spurious timeouts. The 1800s hard cap stays below the container's 3600s outer
+  timeout so pySHACL fails cleanly with a useful message.
+- Local `just build` now builds for the host architecture by default (with
+  `--load` for local testing) instead of forcing `linux/amd64`. On Apple
+  Silicon an amd64 image runs under QEMU ~14× slower, pushing heavy validators
+  past their wall-clock budgets and causing spurious local "timeouts".
+  Production images (`build-push` / CI) remain pinned to `linux/amd64`; set
+  `VALIDATOR_BUILD_PLATFORM` to force a platform for parity testing.
+
+## [0.7.0] - 2026-06-03
+
+### Added
+
+- SHACL validator backend — isolated-container SHACL/RDF validation
+  (`validator_backends/shacl/`), so untrusted RDF parsing and author-supplied
+  SPARQL (SHACL-AF constraints + SPARQL-ASK assertions) execute in the
+  container backend rather than in-process in the Django worker. Consumes the
+  `validibot-shared` `SHACLInputEnvelope` contract. (Backfilled entry: 0.7.0
+  was tagged and released without a changelog section.)
+
 ## [0.6.0] - 2026-05-03
 
 ### Added

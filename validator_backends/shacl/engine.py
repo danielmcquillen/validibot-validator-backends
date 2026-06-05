@@ -54,8 +54,17 @@ HARD_MAX_SHAPE_TRIPLES = 200_000
 HARD_MAX_ONTOLOGY_TRIPLES = 500_000
 HARD_MAX_VALIDATION_DEPTH = 50
 
-DEFAULT_PYSHACL_TIMEOUT_SECONDS = 30
-HARD_MAX_PYSHACL_TIMEOUT_SECONDS = 120
+# pySHACL wall-clock budget. This is a backstop against pathological
+# shapes/SPARQL, NOT the size guard — input size is bounded separately by the
+# triple-count caps above (data graph hard-capped at 1M triples). The budget is
+# therefore generous: a real building model near the triple cap can legitimately
+# take minutes (SHACL cost grows super-linearly in constraints x target nodes).
+# The 1800s (30 min) hard cap sits below the container's outer timeout (3600s) so
+# pySHACL times out cleanly with a useful message instead of an opaque container
+# kill. Must mirror Django's _DEFAULT_PYSHACL_TIMEOUT / _HARD_MAX_PYSHACL_TIMEOUT
+# (validibot/.../shacl/launch.py) and SHACL_VALIDATION_TIMEOUT_SECONDS (base.py).
+DEFAULT_PYSHACL_TIMEOUT_SECONDS = 300
+HARD_MAX_PYSHACL_TIMEOUT_SECONDS = 1800
 
 DEFAULT_SPARQL_QUERY_TIMEOUT_SECONDS = 10
 HARD_MAX_SPARQL_QUERY_TIMEOUT_SECONDS = 60
