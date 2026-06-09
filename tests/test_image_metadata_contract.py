@@ -45,9 +45,7 @@ def test_dockerfiles_define_oci_version_labels():
         assert "ARG VALIDATOR_BACKEND_VERSION" in text
         assert "ARG VALIDATOR_BACKEND_REVISION" in text
         assert 'org.opencontainers.image.version="${VALIDATOR_BACKEND_VERSION}"' in text
-        assert (
-            'org.opencontainers.image.revision="${VALIDATOR_BACKEND_REVISION}"' in text
-        )
+        assert 'org.opencontainers.image.revision="${VALIDATOR_BACKEND_REVISION}"' in text
         assert "io.validibot.validator-backend.slug=" in text
 
 
@@ -71,13 +69,13 @@ def test_dockerfiles_bake_version_default():
             re.MULTILINE,
         )
         assert match is not None, (
-            f"{path} must declare ``ARG VALIDATOR_BACKEND_VERSION=\"<version>\"`` "
+            f'{path} must declare ``ARG VALIDATOR_BACKEND_VERSION="<version>"`` '
             "with an explicit default — that's the single source of truth."
         )
         version = match.group(1)
         assert version != "unknown", (
-            f"{path} still has the placeholder default ``\"unknown\"``. "
-            "Bake the actual backend wrapper version (e.g. \"0.1.0\")."
+            f'{path} still has the placeholder default ``"unknown"``. '
+            'Bake the actual backend wrapper version (e.g. "0.1.0").'
         )
         # Match a permissive semver-ish shape; we don't care about the
         # specific value, only that it's a real version string. Pre-

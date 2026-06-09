@@ -7,6 +7,7 @@ Handles downloading input files, running EnergyPlus, and extracting results.
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 import subprocess
 import time
@@ -27,6 +28,214 @@ if TYPE_CHECKING:
     from validibot_shared.energyplus.envelopes import EnergyPlusInputEnvelope
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Defense-in-depth: pre-run inspection of user-supplied model files
+# ---------------------------------------------------------------------------
+#
+# WHY: EnergyPlus runs a native binary against an arbitrary, user-supplied
+# IDF/epJSON model. Several first-class IDF object types are effectively code
+# or external-resource loaders — they let a model author load shared
+# libraries, reach out to the network/filesystem, or run interpreted code
+# during the simulation:
+#
+#   * PythonPlugin:*                                  → loads & runs Python
+#   * ExternalInterface (+ FMU import/export)         → loads FMU shared libs,
+#                                                        opens sockets (BCVTB)
+#   * EnergyManagementSystem:Program/Subroutine       → runs Erl runtime code
+#   * Schedule:File pointing at an absolute/remote path → reads arbitrary files
+#
+# The sandboxed container is and remains the PRIMARY security boundary; this
+# scan is defense-in-depth only. We reject by default so a malicious or
+# accidentally-dangerous model cannot reach these capabilities even if the
+# container's isolation is weakened or misconfigured. Operators with a
+# legitimate need (e.g. trusted internal FMU co-simulation) can opt out via
+# the ALLOW_UNSAFE_IDF_OBJECTS module constant.
+
+# Off-by-default escape hatch. Set to True only in a deployment that fully
+# trusts its model authors AND accepts that the container is the sole boundary.
+ALLOW_UNSAFE_IDF_OBJECTS = False
+
+# High-risk IDF/epJSON object-type tokens (matched case-insensitively as plain
+# substrings against the raw model text). These map to capabilities that load
+# code, load native libraries, open sockets, or read arbitrary files. The
+# longer/more-specific tokens are intentionally listed so the reported reason
+# is precise; the short prefixes catch the remaining variants.
+UNSAFE_IDF_OBJECT_TOKENS = (
+    "PythonPlugin",
+    "ExternalInterface:FunctionalMockupUnitImport",
+    "ExternalInterface:FunctionalMockupUnitExport",
+    "ExternalInterface",
+    "EnergyManagementSystem:Program",
+    "EnergyManagementSystem:Subroutine",
+)
+
+# Schedule:File is only dangerous when it references an absolute or remote
+# path (a relative path resolves inside the sandboxed work_dir). We flag it
+# separately so an ordinary, in-work-dir Schedule:File is not rejected.
+_SCHEDULE_FILE_TOKEN = "Schedule:File"
+_REMOTE_PATH_PREFIXES = ("http://", "https://", "ftp://", "file://", "\\\\")
+
+# Number of leading bytes of the model file to inspect. The header region of
+# an IDF/epJSON is where object definitions live; capping the read keeps the
+# scan cheap and bounded for very large generated models.
+MODEL_SCAN_MAX_BYTES = 5_000_000
+
+
+class UnsafeModelObjectError(ValueError):
+    """Raised when a model file contains a high-risk IDF/epJSON object type.
+
+    WHY: Signals that the defense-in-depth pre-run scan rejected the model
+    before EnergyPlus was invoked. Subclasses ``ValueError`` so existing
+    callers that treat input-validation failures as ``ValueError`` continue
+    to handle it as a (non-retryable) bad-input condition.
+    """
+
+
+def _detect_unsafe_model_objects(model_text: str) -> str | None:
+    """Return a human-readable reason if the model text uses an unsafe object.
+
+    The scan is a conservative, case-insensitive substring match over the raw
+    model text. It is intentionally coarse: it does not parse the IDF/epJSON
+    grammar, so it errs toward flagging (false positives are acceptable;
+    silently running dangerous objects is not).
+
+    Args:
+        model_text: Raw text of the IDF or epJSON model file.
+
+    Returns:
+        A short reason string describing the first unsafe object found, or
+        ``None`` if no high-risk object types were detected.
+    """
+    lowered = model_text.lower()
+
+    for token in UNSAFE_IDF_OBJECT_TOKENS:
+        if token.lower() in lowered:
+            return f"model references high-risk object type {token!r}"
+
+    # Schedule:File is only flagged when its file-name field points outside the
+    # work_dir, i.e. at an absolute path or a remote URL. A relative path
+    # resolves inside the sandboxed work_dir and is fine. We extract each
+    # Schedule:File *object body* (the text from the object type up to its
+    # terminating ';') and inspect its comma-separated fields, so that an
+    # absolute path in some unrelated object does not trigger a false positive.
+    if _SCHEDULE_FILE_TOKEN.lower() in lowered:
+        for body in _iter_object_bodies(model_text, _SCHEDULE_FILE_TOKEN):
+            reason = _classify_schedule_file_path(body)
+            if reason is not None:
+                return reason
+
+    return None
+
+
+def _iter_object_bodies(model_text: str, object_type: str):
+    """Yield the raw text of each IDF/epJSON object of ``object_type``.
+
+    An IDF object starts with its type token and ends at the next ``;`` field
+    terminator. This is a deliberately loose extractor (it also works on the
+    flattened text of an epJSON file, where the field values still appear as
+    substrings) used only to bound the region we inspect for unsafe paths.
+
+    Args:
+        model_text: Raw model text.
+        object_type: The object type token to search for (e.g. ``Schedule:File``).
+
+    Yields:
+        The substring from each occurrence of ``object_type`` up to (and
+        including) the next semicolon, or to end-of-text if none follows.
+    """
+    lowered = model_text.lower()
+    needle = object_type.lower()
+    start = lowered.find(needle)
+    while start != -1:
+        end = model_text.find(";", start)
+        if end == -1:
+            yield model_text[start:]
+            return
+        yield model_text[start : end + 1]
+        start = lowered.find(needle, end + 1)
+
+
+def _classify_schedule_file_path(object_body: str) -> str | None:
+    """Return a reason if a Schedule:File object body uses an unsafe path.
+
+    Each comma/semicolon-separated field of the object body is examined for a
+    remote URL, an absolute POSIX path, or a Windows drive path. IDF comments
+    run from ``!`` to end-of-line, so we strip them per physical line *before*
+    splitting into fields — otherwise a comment on one line would swallow the
+    field value on the next, hiding an absolute path and causing a dangerous
+    false negative.
+
+    Args:
+        object_body: The raw text of one ``Schedule:File`` object.
+
+    Returns:
+        A reason string if an absolute/remote path is referenced, else ``None``.
+    """
+    # Strip end-of-line IDF comments line by line, then re-join.
+    decommented = "\n".join(line.split("!", 1)[0] for line in object_body.splitlines())
+
+    for raw_field in re.split(r"[,;]", decommented):
+        field = raw_field.strip()
+        if not field:
+            continue
+        lowered_field = field.lower()
+        if any(prefix in lowered_field for prefix in _REMOTE_PATH_PREFIXES):
+            return f"{_SCHEDULE_FILE_TOKEN} references a remote path"
+        if field.startswith("/"):
+            return f"{_SCHEDULE_FILE_TOKEN} references an absolute path"
+        if re.match(r"[A-Za-z]:[\\/]", field):
+            return f"{_SCHEDULE_FILE_TOKEN} references an absolute path"
+    return None
+
+
+def _scan_model_for_unsafe_objects(model_file: Path) -> None:
+    """Reject a model file that contains high-risk IDF/epJSON object types.
+
+    This is a defense-in-depth check that runs BEFORE the EnergyPlus binary is
+    invoked. The sandboxed container remains the primary security boundary;
+    this scan adds a cheap second layer so a model that loads code, loads
+    native libraries, opens sockets, or reads arbitrary files cannot reach
+    those capabilities by default.
+
+    Set the module constant ``ALLOW_UNSAFE_IDF_OBJECTS = True`` to bypass the
+    check in a deployment that fully trusts its model authors.
+
+    Args:
+        model_file: Path to the downloaded IDF or epJSON model file.
+
+    Raises:
+        UnsafeModelObjectError: If an unsafe object type is detected and
+            ``ALLOW_UNSAFE_IDF_OBJECTS`` is False.
+    """
+    if ALLOW_UNSAFE_IDF_OBJECTS:
+        logger.warning(
+            "ALLOW_UNSAFE_IDF_OBJECTS is enabled; skipping model safety scan for %s",
+            model_file,
+        )
+        return
+
+    try:
+        model_text = model_file.read_text(encoding="utf-8", errors="replace")[
+            :MODEL_SCAN_MAX_BYTES
+        ]
+    except OSError as exc:
+        # If we cannot read the model to inspect it, fail closed rather than
+        # running an uninspected file through the native binary.
+        raise UnsafeModelObjectError(
+            f"Could not read model file for safety inspection: {model_file}",
+        ) from exc
+
+    reason = _detect_unsafe_model_objects(model_text)
+    if reason is not None:
+        logger.warning("Rejecting EnergyPlus model %s: %s", model_file, reason)
+        raise UnsafeModelObjectError(
+            "EnergyPlus model rejected by defense-in-depth safety scan: "
+            f"{reason}. These object types can load code, load native "
+            "libraries, open network sockets, or read arbitrary files. Set "
+            "ALLOW_UNSAFE_IDF_OBJECTS=True only in a fully trusted deployment.",
+        )
 
 
 def run_energyplus_simulation(
@@ -209,7 +418,17 @@ def _run_energyplus(
 
     Returns:
         Tuple of (returncode, stdout, stderr)
+
+    Raises:
+        UnsafeModelObjectError: If the defense-in-depth scan rejects the model
+            because it contains a high-risk IDF/epJSON object type.
     """
+    # Defense-in-depth: inspect the user-supplied model before invoking the
+    # native binary. The container is still the primary boundary; this is a
+    # cheap second layer that fails closed on code/library/network/file-loading
+    # object types unless ALLOW_UNSAFE_IDF_OBJECTS is explicitly enabled.
+    _scan_model_for_unsafe_objects(model_file)
+
     # Build EnergyPlus command
     cmd = [
         "energyplus",
@@ -590,7 +809,6 @@ def parse_err_file(err_path: Path | None) -> list[dict]:
     #   ** Warning ** message text
     #   ** Severe  ** message text
     #   **  Fatal  ** message text
-    import re
 
     # Split into lines and process
     lines = content.split("\n")
