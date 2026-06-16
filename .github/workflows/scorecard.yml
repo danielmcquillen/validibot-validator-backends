@@ -1,4 +1,4 @@
-# Trust ADR Phase 5 Session D — OpenSSF Scorecard health checks.
+# OpenSSF Scorecard health checks.
 #
 # Scorecard inspects this repo's open-source security hygiene
 # and publishes a score to the public OSSF Scorecard dashboard.

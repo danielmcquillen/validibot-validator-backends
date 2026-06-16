@@ -42,14 +42,6 @@ dependencies = [
     "google-auth==2.53.0",
     "requests==2.34.2",
     "sentry-sdk==2.62.0",
-    # Trust ADR Phase 5 Session A — 0.7.0 adds an optional
-    # ``StepValidatorRecord.validator_backend_image_digest`` field on
-    # the producer-side evidence manifest schema. The backends don't
-    # *use* the new field (they only touch
-    # ``validibot_shared.{validations,fmu,energyplus}.envelopes``),
-    # but we keep validibot-shared in lockstep with the validibot
-    # producer so downstream tooling that pulls dependency
-    # signatures across repos sees a single version.
     "validibot-shared==0.9.2",
 ]
 

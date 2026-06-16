@@ -375,10 +375,6 @@ The factory (`get_callback_auth()`) reads `DEPLOYMENT_TARGET` at
 startup and caches the backend for the container's lifetime, so the
 google-auth transport's connection pool is reused across callbacks.
 
-See
-[ADR-2026-04-18: Platform-Agnostic Worker Endpoint Authentication](https://github.com/mcquilleninteractive/validibot-project/blob/main/docs/adr/completed/2026-04-18-worker-endpoint-auth-platform-agnostic.md)
-for the full cross-repo architecture.
-
 ### Storage URIs
 
 Validator backends support two storage backends:

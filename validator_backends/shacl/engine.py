@@ -11,8 +11,7 @@ posture are identical; the adaptations are mechanical:
 - The killable subprocess workers are addressed by their container module paths.
 
 Everything that touches the untrusted graph or runs author-supplied SPARQL lives
-here, and *only* here, behind the container isolation boundary. See ADR-2026-05-18
-for the security rationale.
+here, and *only* here, behind the container isolation boundary. 
 """
 
 from __future__ import annotations

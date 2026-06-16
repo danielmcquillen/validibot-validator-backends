@@ -43,8 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Release workflow `.github/workflows/release.yml` (Trust ADR
-  Phase 5 Session D). On a signed tag push, the workflow verifies
+- Release workflow `.github/workflows/release.yml`. 
+  On a signed tag push, the workflow verifies
   the tag signature and builds each backend image (energyplus +
   fmu) in parallel. Each image is published with full
   supply-chain provenance:
@@ -77,8 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bump `validibot-shared` 0.6.0 → 0.7.0. Trust ADR Phase 5 Session A
-  added an optional ``StepValidatorRecord.validator_backend_image_digest``
+- Bump `validibot-shared` 0.6.0 → 0.7.0. 
+  Added an optional ``StepValidatorRecord.validator_backend_image_digest``
   field on the producer-side evidence manifest schema. The validator
   backends don't use the new field (they only touch
   ``validibot_shared.{validations,fmu,energyplus}.envelopes``), but
@@ -139,8 +139,7 @@ their own dispatch code or orchestration must rename to
   - `NullCallbackAuth` — no auth headers (for tests / trusted local runs).
 
   Backend selection is factory-driven off the `DEPLOYMENT_TARGET` environment
-  variable, matching the Django side (`validibot/core/api/task_auth.py`). See
-  [ADR-2026-04-18](https://github.com/mcquilleninteractive/validibot-project/blob/main/docs/adr/completed/2026-04-18-worker-endpoint-auth-platform-agnostic.md).
+  variable, matching the Django side (`validibot/core/api/task_auth.py`). 
 
 - **New environment variables** (validator Cloud Run Jobs):
   - `DEPLOYMENT_TARGET` — required; `just deploy` now passes `gcp` automatically.

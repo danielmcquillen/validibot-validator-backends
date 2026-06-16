@@ -1,4 +1,4 @@
-# Trust ADR Phase 5 Session D — Release workflow for validator backends.
+# Release workflow for validator backends.
 #
 # On a signed-tag push (``v*``), build each validator backend image
 # with full supply-chain provenance:
@@ -111,7 +111,7 @@ jobs:
             exit 1
           fi
 
-      # Trust ADR Phase 5 Session D — refuse unsigned tags. The
+      # Refuse unsigned tags. The
       # check fails when ``git verify-tag`` exits non-zero, which
       # happens for unsigned tags or tags signed by a key not in
       # the repo's allowed-signers config.
@@ -205,7 +205,7 @@ jobs:
             echo "ghcr_full_ref=${GHCR_IMAGE}:${TAG_REF}"
           } >> "$GITHUB_OUTPUT"
 
-      # Trust ADR Phase 5 Session D — single build that emits the
+      # Single build that emits the
       # image, an OCI-attached SBOM (SPDX), and BuildKit provenance.
       # ``attest-build-provenance`` (next step) layers the
       # sigstore-signed attestation on top of the digest this step

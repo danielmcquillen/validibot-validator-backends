@@ -16,7 +16,7 @@ community repo, with one difference: there is no Django here, so
 If you tighten the rules here, mirror the change in the Django copy (and vice
 versa). The scrub is the robust control behind the isolation boundary.
 
-What we forbid (per ADR-2026-05-18 "Security" → "SPARQL AST scrubbing"):
+What we forbid :
 
 - Top-level form ≠ ``ASK`` (SELECT/CONSTRUCT/DESCRIBE rejected; Update ops are
   refused by the parser itself, and we also list their algebra node names).
@@ -45,7 +45,6 @@ from rdflib.plugins.sparql.parser import parseQuery
 from rdflib.plugins.sparql.parserutils import CompValue
 
 
-# Defaults match the resource-limits table in ADR-2026-05-18.
 DEFAULT_MAX_QUERY_LENGTH = 10_000
 DEFAULT_MAX_PROPERTY_PATH_DEPTH = 8
 HARD_MAX_QUERY_LENGTH = 50_000
@@ -262,6 +261,5 @@ def _forbidden_node_message(name: str) -> str:
         )
     return (
         f"SPARQL construct '{name}' is not permitted in author-defined "
-        "ASK assertions. See ADR-2026-05-18 'Security' for the full "
-        "rejection list."
+        "ASK assertions."
     )

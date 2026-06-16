@@ -263,8 +263,3 @@ digest, blocking the deploy.
 - **`validibot-shared`** — Pydantic models on PyPI. Verify via
   PyPI's OIDC attestation UI or the `pypi-attestations` CLI.
 
-## ADR reference
-
-The full architectural rationale for this release model lives in
-[ADR-2026-04-27 §Phase 5 Session D](https://github.com/danielmcquillen/validibot/blob/main/docs/adr/2026-04-27-trust-boundary-hardening-and-evidence-first-validation.md)
-in the `validibot-project` repository.
