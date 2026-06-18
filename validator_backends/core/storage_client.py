@@ -84,6 +84,11 @@ def parse_gcs_uri(uri: str) -> tuple[str, str]:
         raise ValueError(f"Invalid GCS URI (missing path): {uri}")
 
     bucket_name, blob_path = parts
+    # Reject empty components: ``gs:///path`` (no bucket) and ``gs://bucket/``
+    # (no object) both pass the split above but fail later inside the GCS
+    # client with an opaque error. Fail fast here with a clear message.
+    if not bucket_name or not blob_path:
+        raise ValueError(f"Invalid GCS URI (empty bucket or path): {uri}")
     return bucket_name, blob_path
 
 

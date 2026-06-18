@@ -196,13 +196,34 @@ deploy validator stage: (build-push validator)
         exit 1
     fi
 
-    # Compute stage-specific names
+    # Compute stage-specific names.
+    #
+    # Two DISTINCT service accounts, matching the main repo's
+    # `just validator-deploy` (validibot/just/gcp/mod.just):
+    #   * RUNTIME_SA — the dedicated, least-privilege identity the validator
+    #     container RUNS AS (--service-account). It has GCS access on the run
+    #     bundle and run.invoker on the worker (for callbacks), but NOT
+    #     secrets / Cloud SQL / Cloud Tasks / KMS. A compromised validator is
+    #     thus contained.
+    #   * INVOKER_SA — the main web/worker identity allowed to TRIGGER the job
+    #     (granted validibot_job_runner below). The Django worker runs as this
+    #     SA when it calls the Jobs API to launch a validation.
+    #
+    # Previously both were the broad `validibot-cloudrun-*` SA, so the container
+    # ran with the full app identity (secrets/DB/tasks/KMS). Because this recipe
+    # and the main repo's recipe deploy the SAME job name, whichever ran last
+    # set the job's runtime identity — so the standalone path could silently
+    # widen it. Using RUNTIME_SA here keeps both deploy paths in agreement on
+    # least privilege. (Both SAs are created by `just gcp init-stage` in the
+    # main repo; run that first.)
     if [ "{{stage}}" = "prod" ]; then
         JOB_NAME="validibot-validator-backend-{{validator}}"
-        SA="validibot-cloudrun-prod@{{gcp_project}}.iam.gserviceaccount.com"
+        RUNTIME_SA="validibot-validator-prod@{{gcp_project}}.iam.gserviceaccount.com"
+        INVOKER_SA="validibot-cloudrun-prod@{{gcp_project}}.iam.gserviceaccount.com"
     else
         JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
-        SA="validibot-cloudrun-{{stage}}@{{gcp_project}}.iam.gserviceaccount.com"
+        RUNTIME_SA="validibot-validator-{{stage}}@{{gcp_project}}.iam.gserviceaccount.com"
+        INVOKER_SA="validibot-cloudrun-{{stage}}@{{gcp_project}}.iam.gserviceaccount.com"
     fi
 
     echo "Deploying $JOB_NAME to {{stage}}..."
@@ -210,22 +231,24 @@ deploy validator stage: (build-push validator)
         --image {{ar_repo}}/validibot-validator-backend-{{validator}}:{{git_sha}} \
         --region {{gcp_region}} \
         --project {{gcp_project}} \
-        --service-account "$SA" \
+        --service-account "$RUNTIME_SA" \
         --memory 4Gi \
         --cpu 2 \
         --max-retries 0 \
         --task-timeout 3600 \
         --set-env-vars "PYTHONUNBUFFERED=1,VALIDIBOT_STAGE={{stage}},DEPLOYMENT_TARGET=gcp" \
         --labels "validator={{validator}},revision={{git_sha}},stage={{stage}}"
-    echo "✓ $JOB_NAME deployed"
+    echo "✓ $JOB_NAME deployed (runs as $RUNTIME_SA)"
 
-    # Grant the service account permission to run this job with overrides
-    # Uses custom role with run.jobs.run + run.jobs.runWithOverrides (for VALIDIBOT_INPUT_URI env)
-    echo "Granting job runner permission to $SA on $JOB_NAME..."
+    # Grant the MAIN web/worker SA permission to run this job with overrides.
+    # Uses custom role with run.jobs.run + run.jobs.runWithOverrides (for the
+    # VALIDIBOT_INPUT_URI env override). This is the INVOKER, NOT the runtime
+    # identity set above.
+    echo "Granting job runner permission to $INVOKER_SA on $JOB_NAME..."
     gcloud run jobs add-iam-policy-binding "$JOB_NAME" \
         --region {{gcp_region}} \
         --project {{gcp_project}} \
-        --member="serviceAccount:$SA" \
+        --member="serviceAccount:$INVOKER_SA" \
         --role="projects/{{gcp_project}}/roles/validibot_job_runner"
     echo "✓ IAM binding added"
 
