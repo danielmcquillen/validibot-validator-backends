@@ -38,19 +38,19 @@ classifiers = [
 dependencies = [
     "pydantic==2.13.4",
     "httpx==0.28.1",
-    "google-cloud-storage==3.11.0",
-    "google-auth==2.53.0",
+    "google-cloud-storage==3.12.0",
+    "google-auth==2.55.0",
     "requests==2.34.2",
-    "sentry-sdk==2.62.0",
+    "sentry-sdk==2.63.0",
     "validibot-shared==0.9.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==9.0.3",
+    "pytest==9.1.0",
     "pytest-mock==3.15.1",
     "pytest-cov==7.1.0",
-    "ruff==0.15.16",
+    "ruff==0.15.17",
     "mypy==2.1.0",
 ]
 
