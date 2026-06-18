@@ -30,7 +30,12 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        # --no-sources ignores [tool.uv.sources] (the local ../validibot-shared
+        # editable override used for dev) so CI resolves the published
+        # validibot-shared from the index, matching what container images ship.
+        # --all-extras installs the per-validator groups (shacl, fmu, ...) that
+        # pytest's testpaths collect; without them those modules fail to import.
+        run: uv sync --all-extras --no-sources
 
       - name: Audit dependencies
         run: uvx pip-audit
