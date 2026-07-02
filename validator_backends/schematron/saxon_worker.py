@@ -44,13 +44,15 @@ TRANSPILER_STYLESHEET = "transpile.xsl"
 # Property support varies across SaxonC-HE releases, so each is attempted
 # independently; a property the build doesn't recognise is skipped (the
 # container-level isolation is the enforcement of last resort).
-# ``allowedProtocols=file`` keeps doc()/sch:include resolution off http(s)
-# at the Saxon layer too — the engine itself only ever hands Saxon file
-# paths, so nothing legitimate is lost.
+# ``allowedProtocols`` is intentionally empty. The engine hands the submitted
+# .sch and XML paths to Saxon directly through the API, so URI retrieval
+# functions (doc(), document(), unparsed-text(), collection()) need no ambient
+# file/http authority. Re-enable this only with a run-scoped resolver/bundle
+# model; ``file`` here lets author rules read arbitrary container-local XML.
 SECURE_PROCESSOR_PROPERTIES: tuple[tuple[str, str], ...] = (
     ("http://saxon.sf.net/feature/allow-external-functions", "false"),
     ("http://saxon.sf.net/feature/xInclude-aware", "false"),
-    ("http://saxon.sf.net/feature/allowedProtocols", "file"),
+    ("http://saxon.sf.net/feature/allowedProtocols", ""),
 )
 
 EXIT_OK = 0

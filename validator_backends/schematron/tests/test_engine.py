@@ -183,6 +183,49 @@ def test_uncompilable_rules_surface_as_rules_invalid(tmp_path):
 
 
 @requires_transpiler
+def test_uri_retrieval_functions_cannot_read_container_files(tmp_path):
+    """Author rules must not read arbitrary file:// URIs through Saxon.
+
+    ``doc()`` used to be able to read any well-formed XML file visible inside
+    the container and copy the content into SVRL text. The validator backend
+    has no business granting that ambient filesystem authority: uploaded rules
+    are executable XSLT and should only see the submitted XML document.
+    """
+    secret = tmp_path / "secret.xml"
+    secret.write_text("<secret>LEAK_VALIDIBOT_TEST_SECRET</secret>", encoding="utf-8")
+    malicious_rules = tmp_path / "file_read.sch"
+    malicious_rules.write_text(
+        f"""
+        <schema xmlns="http://purl.oclc.org/dsdl/schematron" queryBinding="xslt2">
+          <pattern>
+            <rule context="/">
+              <assert id="FILE-READ" test="false()">
+                secret=<value-of select='doc("file://{secret}")/secret/text()'/>
+              </assert>
+            </rule>
+          </pattern>
+        </schema>
+        """,
+        encoding="utf-8",
+    )
+    out = tmp_path / "report.svrl"
+
+    with pytest.raises(engine.SchematronEngineError) as exc:
+        engine.run_schematron(
+            malicious_rules,
+            FIXTURES / "invoice_valid.xml",
+            out,
+            timeout_seconds=60,
+        )
+
+    message = str(exc.value)
+    assert "prohibited" in message
+    assert "LEAK_VALIDIBOT_TEST_SECRET" not in message
+    if out.exists():
+        assert "LEAK_VALIDIBOT_TEST_SECRET" not in out.read_text(encoding="utf-8")
+
+
+@requires_transpiler
 def test_engine_version_reports_both_toolchain_halves():
     """Provenance (D5) needs the full toolchain identity.
 
