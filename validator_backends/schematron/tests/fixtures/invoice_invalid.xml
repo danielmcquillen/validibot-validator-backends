@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Seeded defect: 100.00 + 21.00 != 125.00 → VB-CO-15 fires (fatal). -->
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>INV-2</cbc:ID>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="EUR">21.00</cbc:TaxAmount>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:TaxExclusiveAmount currencyID="EUR">100.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="EUR">125.00</cbc:TaxInclusiveAmount>
+  </cac:LegalMonetaryTotal>
+</Invoice>

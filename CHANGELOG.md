@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New **Schematron validator backend** (`validator_backends/schematron/`,
+  image `validibot-validator-backend-schematron`) per ADR-2026-07-01: runs
+  curated, checksum-pinned Schematron rule packs (compiled XSLT 2.0, e.g.
+  EN 16931 / Peppol BIS Billing 3.0) over XML submissions using SaxonC-HE
+  12.9 (MPL-2.0; license notices copied to `/app/THIRD_PARTY_NOTICES/`).
+  The pack artefact arrives per run as a staged reference and is
+  checksum-verified before execution; the submission is re-guarded with the
+  defusedxml posture; the transform runs in a subprocess with a hard
+  wall-clock timeout; engine failures map to the D9 taxonomy
+  (`engine_status` / `engine_error_code`) instead of fabricated findings.
+- `schematron` optional-dependency extra (saxonche + defusedxml) wired into
+  the `just test` recipes.
+
+### Changed
+
+- `validibot-shared` bumped to 0.11.0 (Schematron envelope contract + the
+  canonical SVRL parser).
+
 ## [0.7.1] - 2026-06-06
 
 ### Changed

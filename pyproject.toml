@@ -42,7 +42,7 @@ dependencies = [
     "google-auth==2.55.1",
     "requests==2.34.2",
     "sentry-sdk==2.64.0",
-    "validibot-shared==0.10.0",
+    "validibot-shared==0.11.0",
 ]
 
 [project.optional-dependencies]
@@ -70,6 +70,14 @@ shacl = [
     "owlrl==7.1.4",
     "defusedxml==0.7.1",
     "lxml==6.1.1",
+]
+
+# Schematron validator dependencies (for local dev/testing). SaxonC-HE is
+# the chosen XSLT 2.0 engine (ADR-2026-07-01 D4, MPL-2.0); defusedxml pins
+# match the community repo's hardened-XML guard.
+schematron = [
+    "saxonche==12.9.0",
+    "defusedxml==0.7.1",
 ]
 
 [project.urls]

@@ -1,0 +1,19 @@
+# Runtime dependencies for the Schematron validator container.
+pydantic==2.13.4
+httpx==0.28.1
+google-cloud-storage==3.12.0
+google-auth==2.55.1
+
+# Hardened-XML guard (defence in depth; Django pre-guards before dispatch).
+defusedxml==0.7.1
+
+# The XSLT 2.0 engine (ADR-2026-07-01 D4): SaxonC-HE via the Python wheel —
+# no JVM, in-process bindings, MPL-2.0 (license files are copied to
+# /app/THIRD_PARTY_NOTICES/saxonche/ in the Dockerfile).
+saxonche==12.9.0
+
+# Validibot shared library (from PyPI) — needs the schematron envelope
+# contract + the canonical SVRL parser introduced in 0.11.0.
+# NOTE: the image cannot build until 0.11.0 is published to PyPI.
+# Pin exact version to bust Docker layer cache on upgrades.
+validibot-shared==0.11.0

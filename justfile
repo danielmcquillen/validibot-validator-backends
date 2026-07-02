@@ -64,11 +64,11 @@ validators := "energyplus fmu shacl"
 
 # Run all tests
 test *args:
-    uv run --extra dev --extra fmu --extra shacl pytest {{args}}
+    uv run --extra dev --extra fmu --extra shacl --extra schematron pytest {{args}}
 
 # Run tests for a specific validator
 test-validator validator:
-    uv run --extra dev --extra fmu --extra shacl pytest validator_backends/{{validator}}/tests
+    uv run --extra dev --extra fmu --extra shacl --extra schematron pytest validator_backends/{{validator}}/tests
 
 # Lint all code
 lint:
