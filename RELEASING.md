@@ -262,4 +262,3 @@ digest, blocking the deploy.
   the source-clone verification recipe.
 - **`validibot-shared`** — Pydantic models on PyPI. Verify via
   PyPI's OIDC attestation UI or the `pypi-attestations` CLI.
-

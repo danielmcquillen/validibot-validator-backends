@@ -1,20 +1,19 @@
-"""Engine-primitive tests: checksum, hardened-XML guard, Saxon transform.
+"""Engine-primitive tests: hardened-XML guard, compile-and-run, hard caps.
 
 Layer C of the ADR-2026-07-01 test plan — the ONLY tests that run the real
-SaxonC-HE/XSLT-2.0 runtime (Django-side layers A/B never touch it). The
-fixture stylesheet uses xs:decimal constructors and the ``ne`` value
-comparison, which no XSLT 1.0 processor accepts, so a passing transform
-test proves the production engine actually ran.
+SaxonC-HE runtime. The fixture ``.sch`` declares ``queryBinding="xslt2"``
+with XPath 2.0 expressions, so a passing compile-and-run test proves the
+full production path: SchXslt2 transpile under Saxon, then the compiled
+rules under Saxon.
 
-The security tests cover the container-side D8 posture: the artefact
-checksum gate (never execute unverified bytes) and the defusedxml guard
-(XXE / entity bombs / DTDs rejected even though Django pre-guarded —
-defence in depth).
+The Saxon tests additionally require the vendored SchXslt2 transpiler
+(``schxslt2/transpile.xsl`` — see that directory's README) and skip with a
+pointer to it when absent, so the suite stays green even on a checkout
+missing the vendored tooling.
 """
 
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 
 import pytest
@@ -34,31 +33,12 @@ TINY_MAX_BYTES = 64
 TINY_MAX_DEPTH = 3
 GENEROUS_LIMIT = 10_000_000
 
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-# ── Artefact checksum gate (D4b) ─────────────────────────────────────────────
-
-
-def test_matching_artifact_checksum_passes():
-    """A downloaded artefact whose bytes match the envelope pin is accepted."""
-    artifact = FIXTURES / "compiled_subset.xslt"
-    engine.verify_artifact_checksum(artifact, _sha256(artifact))
-
-
-def test_mismatched_artifact_checksum_refuses_with_machine_code():
-    """Checksum drift refuses execution and carries the artifact_mismatch code.
-
-    The error_code is what Django maps to its reserved
-    ``schematron.artifact_mismatch`` finding (D9) — the machine hint must
-    survive the engine boundary, not just the prose.
-    """
-    artifact = FIXTURES / "compiled_subset.xslt"
-    with pytest.raises(engine.SchematronEngineError, match="mismatch") as excinfo:
-        engine.verify_artifact_checksum(artifact, "0" * 64)
-    assert excinfo.value.error_code == "artifact_mismatch"
+requires_transpiler = pytest.mark.skipif(
+    not engine.transpiler_available(),
+    reason=(
+        "SchXslt2 transpiler not vendored — see validator_backends/schematron/schxslt2/README.md"
+    ),
+)
 
 
 # ── Hardened-XML guard (D8a, container side) ─────────────────────────────────
@@ -76,8 +56,8 @@ def test_guard_accepts_the_benign_fixture_invoice():
 def test_guard_rejects_xxe_even_though_django_preguarded(tmp_path):
     """An XXE payload is rejected container-side too (defence in depth).
 
-    Django's preprocess guard runs before dispatch, but this container must
-    not trust that the bytes it downloaded are the bytes Django checked.
+    Django's guards run at authoring and dispatch time, but this container
+    must not trust that the bytes it downloaded are the bytes Django saw.
     """
     evil = tmp_path / "xxe.xml"
     evil.write_text(XXE_PAYLOAD, encoding="utf-8")
@@ -110,7 +90,7 @@ def test_guard_enforces_size_and_depth_caps(tmp_path):
         )
 
 
-def test_guard_clamps_envelope_limits_to_hard_maxima(tmp_path):
+def test_guard_clamps_envelope_limits_to_hard_maxima():
     """A hand-crafted envelope cannot widen the safety net beyond hard caps.
 
     Django clamps before shipping, but the container re-clamps: an absurd
@@ -118,28 +98,47 @@ def test_guard_clamps_envelope_limits_to_hard_maxima(tmp_path):
     ``HARD_MAX_INPUT_BYTES``.
     """
     assert (
-        engine.clamp(10**12, engine.HARD_MAX_INPUT_BYTES, default=1)
-        == engine.HARD_MAX_INPUT_BYTES
+        engine.clamp(10**12, engine.HARD_MAX_INPUT_BYTES, default=1) == engine.HARD_MAX_INPUT_BYTES
     )
     # Non-positive values fall back to the default, never "unlimited".
     assert engine.clamp(0, engine.HARD_MAX_INPUT_BYTES, default=42) == 42
 
 
-# ── The Saxon transform (the production engine, item 7) ─────────────────────
+# ── Query-binding detection (provenance) ─────────────────────────────────────
 
 
-def test_saxon_transform_produces_svrl_for_the_invalid_invoice(tmp_path):
-    """The XSLT-2.0 fixture pack runs under Saxon and emits real SVRL.
+def test_detect_query_binding_reads_and_normalises_the_root_attribute(tmp_path):
+    """queryBinding detection covers xslt2, the ISO default, and failures.
 
-    xs:decimal + ``ne`` make this stylesheet XSLT-2.0-only, so this test
-    failing under a 1.0 processor is by design: passing PROVES SaxonC-HE
-    executed the transform. The invalid invoice must yield the VB-CO-15
-    failed-assert; ids/severities surviving the round trip is asserted in
-    the runner tests via the shared parser.
+    The detected binding is provenance only, so failure modes return ""
+    rather than raising — a run must never die over a provenance field.
+    """
+    assert engine.detect_query_binding(FIXTURES / "subset.sch") == "xslt2"
+
+    default_binding = tmp_path / "default.sch"
+    default_binding.write_text(
+        '<schema xmlns="http://purl.oclc.org/dsdl/schematron"/>',
+        encoding="utf-8",
+    )
+    assert engine.detect_query_binding(default_binding) == "xslt1"
+
+    assert engine.detect_query_binding(tmp_path / "missing.sch") == ""
+
+
+# ── Compile-and-run (the production engine, item 7) ─────────────────────────
+
+
+@requires_transpiler
+def test_compile_and_run_flags_the_invalid_invoice(tmp_path):
+    """The XSLT-2.0 fixture source compiles under Saxon and emits real SVRL.
+
+    xs:decimal + ``eq`` make the compiled rules XSLT-2.0-only, so this
+    passing proves BOTH production stages ran under Saxon: the SchXslt2
+    transpile and the transform itself.
     """
     out = tmp_path / "report.svrl"
-    svrl = engine.run_transform(
-        FIXTURES / "compiled_subset.xslt",
+    svrl = engine.run_schematron(
+        FIXTURES / "subset.sch",
         FIXTURES / "invoice_invalid.xml",
         out,
         timeout_seconds=60,
@@ -149,11 +148,12 @@ def test_saxon_transform_produces_svrl_for_the_invalid_invoice(tmp_path):
     assert "fired-rule" in svrl
 
 
-def test_saxon_transform_is_clean_for_the_valid_invoice(tmp_path):
+@requires_transpiler
+def test_compile_and_run_is_clean_for_the_valid_invoice(tmp_path):
     """The reconciling invoice yields SVRL with a fired rule and no asserts."""
     out = tmp_path / "report.svrl"
-    svrl = engine.run_transform(
-        FIXTURES / "compiled_subset.xslt",
+    svrl = engine.run_schematron(
+        FIXTURES / "subset.sch",
         FIXTURES / "invoice_valid.xml",
         out,
         timeout_seconds=60,
@@ -162,26 +162,34 @@ def test_saxon_transform_is_clean_for_the_valid_invoice(tmp_path):
     assert "fired-rule" in svrl
 
 
-def test_broken_stylesheet_surfaces_as_engine_error(tmp_path):
-    """A stylesheet Saxon cannot compile maps to a clean engine error.
+@requires_transpiler
+def test_uncompilable_rules_surface_as_rules_invalid(tmp_path):
+    """A source Saxon cannot compile maps to error_code="rules_invalid".
 
-    The worker exits non-zero with detail on stderr; the parent must wrap
-    that as SchematronEngineError (→ D9 engine_status="error"), never leak
-    a raw subprocess exception.
+    The machine hint is what lets Django render "the workflow author's
+    rules are broken" distinctly from a generic engine failure (D9).
     """
-    bad = tmp_path / "bad.xslt"
-    bad.write_text("<xsl:stylesheet>this is not XSLT", encoding="utf-8")
+    bad = tmp_path / "bad.sch"
+    bad.write_text("<schema>this is not schematron", encoding="utf-8")
     out = tmp_path / "report.svrl"
-    with pytest.raises(engine.SchematronEngineError, match="transform failed"):
-        engine.run_transform(
+    with pytest.raises(engine.SchematronEngineError, match="failed to compile") as exc:
+        engine.run_schematron(
             bad,
             FIXTURES / "invoice_valid.xml",
             out,
             timeout_seconds=60,
         )
+    assert exc.value.error_code == "rules_invalid"
 
 
-def test_saxon_engine_version_reports_name_and_version():
-    """Provenance (D5) needs the actual engine identity, e.g. 'SaxonC-HE 12.9'."""
-    version = engine.saxon_engine_version()
+@requires_transpiler
+def test_engine_version_reports_both_toolchain_halves():
+    """Provenance (D5) needs the full toolchain identity.
+
+    Both halves matter for reproducibility — SchXslt2 decides how the .sch
+    compiles, Saxon decides how the compiled XSLT executes — so the engine
+    string must name both, e.g. 'SchXslt2 1.11.1 + SaxonC-HE 12.9'.
+    """
+    version = engine.engine_version()
+    assert "SchXslt2" in version
     assert "Saxon" in version

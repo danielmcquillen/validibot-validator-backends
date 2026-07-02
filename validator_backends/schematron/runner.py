@@ -2,22 +2,25 @@
 
 Orchestrates one run from the typed input envelope (ADR-2026-07-01 D3/D4b):
 
-1. Download the XML submission (``input_files[0]``) and the staged pack
-   artefact (``inputs.artifact_uri``).
-2. Verify the artefact checksum against the pinned ``artifact_sha256`` —
-   the container never trusts what it fetched.
-3. Re-apply the hardened-XML guard to the submission (D8, defence in depth).
-4. Run the pack XSLT under Saxon with a hard wall-clock timeout.
-5. Parse the SVRL with the canonical shared parser and assemble
+1. Download the XML submission (``input_files[0]``); write the author's
+   rules — which arrived **inline** in ``inputs.schematron_text`` — to a
+   working file.
+2. Re-apply the hardened-XML guard to the submission (D8, defence in depth).
+3. Compile the rules (SchXslt2 transpile) and run them under Saxon, all
+   inside one hard wall-clock timeout.
+4. Parse the SVRL with the canonical shared parser and assemble
    ``SchematronOutputs`` — counts, the ``finding_rule_ids_by_severity``
-   map, capped findings with an explicit truncation marker, and the full
-   D5 provenance (pack pins + actual engine version).
+   map, capped findings with an explicit truncation marker, and the D5
+   provenance (the rules' sha256 from the envelope, the detected query
+   binding, and the engine that actually ran).
 
 Every "couldn't run the rules" outcome maps to the D9 taxonomy
 (``engine_status`` + ``engine_error_code``) with ``passed=None`` — never to
-fabricated rule findings. The CEL/Basic output assertions are intentionally
-NOT run here — they operate on the extracted signals and stay in Django,
-evaluated by ``SchematronValidator.post_execute_validate``.
+fabricated rule findings. In particular, rules that fail to COMPILE report
+``rules_invalid``: an authoring problem, distinct from generic engine
+errors. The CEL/Basic output assertions are intentionally NOT run here —
+they operate on the extracted signals and stay in Django, evaluated by
+``SchematronValidator.post_execute_validate``.
 """
 
 from __future__ import annotations
@@ -83,21 +86,21 @@ def run_schematron_validation(
     with tempfile.TemporaryDirectory(prefix="schematron-") as tmp:
         tmpdir = Path(tmp)
         submission_path = tmpdir / "submission.xml"
-        artifact_path = tmpdir / "pack.xslt"
+        sch_path = tmpdir / "rules.sch"
         svrl_path = tmpdir / "report.svrl"
 
         try:
             download_file(input_envelope.input_files[0].uri, submission_path)
-            download_file(inputs.artifact_uri, artifact_path)
+            sch_path.write_text(inputs.schematron_text, encoding="utf-8")
+            query_binding = engine.detect_query_binding(sch_path)
 
-            engine.verify_artifact_checksum(artifact_path, inputs.artifact_sha256)
             engine.guard_submission(
                 submission_path,
                 max_bytes=inputs.max_input_bytes,
                 max_depth=inputs.max_input_depth,
             )
-            svrl_text = engine.run_transform(
-                artifact_path,
+            svrl_text = engine.run_schematron(
+                sch_path,
                 submission_path,
                 svrl_path,
                 timeout_seconds=inputs.xslt_timeout_seconds,
@@ -158,37 +161,18 @@ def run_schematron_validation(
         ],
         findings_truncated=summary.findings_truncated,
         findings_suppressed_count=summary.findings_suppressed_count,
-        **_provenance(inputs),
+        schematron_sha256=inputs.schematron_sha256,
+        query_binding=query_binding,
+        engine=engine.engine_version(),
         execution_seconds=execution_seconds,
     )
 
-    status = (
-        ValidationStatus.SUCCESS
-        if summary.passed
-        else ValidationStatus.FAILED_VALIDATION
-    )
+    status = ValidationStatus.SUCCESS if summary.passed else ValidationStatus.FAILED_VALIDATION
     return SchematronRunResult(
         status=status,
         messages=_messages_from_outputs(outputs),
         outputs=outputs,
     )
-
-
-def _provenance(inputs) -> dict:
-    """The D5 provenance echo: pins from the envelope + the ACTUAL engine.
-
-    Pack pins come from the verified input envelope; the engine string is
-    what really ran in this container (name + version), not what the pack
-    requested — that difference is exactly what provenance exists to catch.
-    """
-    return {
-        "pack_id": inputs.pack_id,
-        "pack_version": inputs.pack_version,
-        "pack_source_sha256": inputs.source_sha256,
-        "pack_artifact_sha256": inputs.artifact_sha256,
-        "query_binding": inputs.query_binding,
-        "engine": engine.saxon_engine_version(),
-    }
 
 
 def _engine_failure_result(
@@ -211,7 +195,8 @@ def _engine_failure_result(
         engine_message=engine_message,
         engine_error_code=engine_error_code,
         passed=None,
-        **_provenance(inputs),
+        schematron_sha256=inputs.schematron_sha256,
+        engine=engine.engine_version(),
         execution_seconds=execution_seconds,
     )
     return SchematronRunResult(

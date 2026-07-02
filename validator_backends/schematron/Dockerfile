@@ -3,16 +3,18 @@
 # Build context must be the repo root (not validator_backends/schematron/):
 #   docker build -f validator_backends/schematron/Dockerfile -t ... .
 #
-# This container exists for ISOLATION, not compute. It executes curated
-# rule-pack XSLT (SaxonC-HE) over untrusted submitted XML, which must never
-# run next to the Validibot worker's database credentials, identity, or
-# network. Deploy it with a locked-down service account (no DB, no secrets)
-# and egress blocked — that network boundary is the enforcement of last
-# resort behind the in-process Saxon lockdown (ADR-2026-07-01 D8b).
+# This container exists for ISOLATION, not compute. It compiles
+# author-supplied Schematron into XSLT (SchXslt2) and executes it
+# (SaxonC-HE) over untrusted submitted XML, which must never run next to
+# the Validibot worker's database credentials, identity, or network.
+# Deploy it with a locked-down service account (no DB, no secrets) and
+# egress blocked — that network boundary is the enforcement of last resort
+# behind the in-process Saxon lockdown (ADR-2026-07-01 D8b).
 #
-# Rule packs are NEVER baked into this image: they arrive per run as a
-# staged, checksum-verified artefact reference (D4b/D5), so a new pack
-# version ships without rebuilding the container.
+# Rules are NEVER baked into this image: the author's Schematron source
+# arrives per run inline in the input envelope, and this container compiles
+# it with the vendored SchXslt2 transpiler (schxslt2/) before running it
+# (D4b).
 
 FROM python:3.13-slim
 
@@ -59,6 +61,18 @@ RUN groupadd --gid 1000 validibot \
 
 # Copy the entire validator_backends package (includes core, schematron, __init__.py).
 COPY --chown=validibot:validibot validator_backends /app/validator_backends
+
+# SchXslt2 (MIT, vendored at validator_backends/schematron/schxslt2/) —
+# copy its LICENSE beside the Saxon notices for the same discoverability.
+RUN mkdir -p /app/THIRD_PARTY_NOTICES/schxslt2 \
+    && cp /app/validator_backends/schematron/schxslt2/LICENSE \
+        /app/THIRD_PARTY_NOTICES/schxslt2/LICENSE
+
+# Build-time guard: an image without the vendored SchXslt2 transpiler
+# (schxslt2/transpile.xsl — see its README) cannot compile any Schematron,
+# so fail the BUILD loudly rather than every run quietly.
+RUN python -c "from validator_backends.schematron.engine import transpiler_available; \
+    assert transpiler_available(), 'schxslt2/transpile.xsl missing — see schxslt2/README.md'"
 
 USER validibot
 

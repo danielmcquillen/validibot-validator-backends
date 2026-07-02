@@ -259,7 +259,4 @@ def _forbidden_node_message(name: str) -> str:
             "remote RDF documents over the network; the validator "
             "operates only on graphs provided by the pipeline."
         )
-    return (
-        f"SPARQL construct '{name}' is not permitted in author-defined "
-        "ASK assertions."
-    )
+    return f"SPARQL construct '{name}' is not permitted in author-defined ASK assertions."

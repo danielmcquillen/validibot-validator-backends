@@ -1,15 +1,17 @@
-"""Schematron engine primitives: checksum, guards, and the Saxon transform.
+"""Schematron engine primitives: guards, compile-and-run, hard caps.
 
 Container-side half of the ADR-2026-07-01 D8 posture. Django already
-verified and staged the artefact and pre-guarded the submission, but this
-container trusts nothing it downloads (defence in depth):
+validated the uploaded rules at authoring time and pre-guarded the
+submission at dispatch, but this container trusts nothing it receives
+(defence in depth):
 
-- :func:`verify_artifact_checksum` — the fetched pack XSLT must match the
-  pinned sha256 from the input envelope before it is ever compiled.
 - :func:`guard_submission` — the defusedxml posture (no DTD, no entities,
   no external references) plus size/depth caps, re-applied here.
-- :func:`run_transform` — Saxon runs in a **subprocess** with a hard
-  wall-clock timeout (native code cannot be interrupted in-process).
+- :func:`run_schematron` — the SchXslt2 transpile of the author's ``.sch``
+  plus the Saxon run, all inside a **subprocess** with a hard wall-clock
+  timeout (native code cannot be interrupted in-process). A source that
+  fails to COMPILE maps to ``rules_invalid`` — an authoring problem,
+  reported distinctly from generic engine errors (D9).
 
 The D8 limits from the envelope are re-clamped to the hard maxima below —
 Django clamps before shipping, but a hand-crafted envelope must not be able
@@ -18,7 +20,6 @@ to widen the safety net.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import subprocess
 import sys
@@ -26,6 +27,12 @@ from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree as SafeET
 from defusedxml.common import DTDForbidden, EntitiesForbidden, ExternalReferenceForbidden
+
+from validator_backends.schematron.saxon_worker import (
+    EXIT_COMPILE_ERROR,
+    SCHXSLT2_DIR,
+    TRANSPILER_STYLESHEET,
+)
 
 
 if TYPE_CHECKING:
@@ -48,7 +55,7 @@ class SchematronEngineError(Exception):
     """An engine-level failure: the rules were NOT run (D9).
 
     ``error_code`` carries the machine hint for
-    ``SchematronOutputs.engine_error_code`` (e.g. ``artifact_mismatch``) so
+    ``SchematronOutputs.engine_error_code`` (e.g. ``rules_invalid``) so
     Django can map it to its reserved ``schematron.*`` finding codes.
     """
 
@@ -58,7 +65,7 @@ class SchematronEngineError(Exception):
 
 
 class SchematronTransformTimeout(SchematronEngineError):
-    """The XSLT transform exceeded its wall-clock budget (D8/D9)."""
+    """The compile-and-run exceeded its wall-clock budget (D8/D9)."""
 
     def __init__(self, timeout_seconds: int) -> None:
         super().__init__(
@@ -68,30 +75,22 @@ class SchematronTransformTimeout(SchematronEngineError):
         self.timeout_seconds = timeout_seconds
 
 
+def transpiler_available() -> bool:
+    """Whether the vendored SchXslt2 transpiler is present in this build.
+
+    ``transpile.xsl`` is engine tooling vendored into the image (see
+    ``schxslt2/README.md``); a build without it cannot compile any
+    Schematron, so callers fail fast with a clear message instead of a
+    confusing Saxon error.
+    """
+    return (SCHXSLT2_DIR / TRANSPILER_STYLESHEET).is_file()
+
+
 def clamp(value: int, hard_max: int, *, default: int) -> int:
     """Clamp an envelope-supplied limit to its hard maximum."""
     if value <= 0:
         return default
     return min(value, hard_max)
-
-
-def verify_artifact_checksum(artifact_path: Path, expected_sha256: str) -> None:
-    """Verify the downloaded pack artefact against the pinned checksum.
-
-    The container never trusts what it fetched (D4b): a mismatch means
-    tampering or a staging bug, and the rules must not run.
-
-    Raises:
-        SchematronEngineError: with ``error_code="artifact_mismatch"``.
-    """
-    digest = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
-    if digest != expected_sha256:
-        msg = (
-            f"Rule-pack artefact checksum mismatch: fetched sha256 "
-            f"{digest[:12]}… but the envelope pins "
-            f"{expected_sha256[:12]}… — refusing to execute."
-        )
-        raise SchematronEngineError(msg, error_code="artifact_mismatch")
 
 
 def guard_submission(
@@ -125,10 +124,7 @@ def guard_submission(
 
     size = submission_path.stat().st_size
     if size > effective_max_bytes:
-        msg = (
-            f"XML submission is too large ({size:,} bytes > "
-            f"{effective_max_bytes:,} bytes)."
-        )
+        msg = f"XML submission is too large ({size:,} bytes > {effective_max_bytes:,} bytes)."
         raise SchematronEngineError(msg)
 
     try:
@@ -147,26 +143,43 @@ def guard_submission(
     while stack:
         element, depth = stack.pop()
         if depth > effective_max_depth:
-            msg = (
-                f"XML submission nests deeper than the maximum "
-                f"({effective_max_depth} levels)."
-            )
+            msg = f"XML submission nests deeper than the maximum ({effective_max_depth} levels)."
             raise SchematronEngineError(msg)
         stack.extend((child, depth + 1) for child in element)
 
 
-def run_transform(
-    xslt_path: Path,
+def detect_query_binding(sch_path: Path) -> str:
+    """Read the ``queryBinding`` declared by the .sch root, for provenance.
+
+    Normalised to the ``xslt1``/``xslt2`` tokens the contract uses; the ISO
+    default (no attribute, or the legacy ``xslt`` spelling) is ``xslt1``.
+    Detection failures return ``""`` — provenance must never kill a run.
+    """
+    try:
+        root = SafeET.parse(str(sch_path), forbid_dtd=True).getroot()
+    except Exception:
+        logger.warning("Could not detect queryBinding", exc_info=True)
+        return ""
+    binding = (root.get("queryBinding") or "").strip().lower()
+    if binding in ("", "xslt"):
+        return "xslt1"
+    return binding
+
+
+def run_schematron(
+    sch_path: Path,
     xml_path: Path,
     output_path: Path,
     *,
     timeout_seconds: int,
 ) -> str:
-    """Run the pack XSLT over the submission via the Saxon worker subprocess.
+    """Compile the author's .sch and run it via the Saxon worker subprocess.
 
     The subprocess boundary is what makes the timeout REAL: SaxonC executes
     native code that in-process signals cannot interrupt, but
-    ``subprocess.run(timeout=…)`` kills the worker unconditionally.
+    ``subprocess.run(timeout=…)`` kills the worker unconditionally. The
+    budget covers compile AND run — a pathological source can be slow in
+    either phase.
 
     Returns:
         The SVRL report text the worker wrote.
@@ -174,9 +187,17 @@ def run_transform(
     Raises:
         SchematronTransformTimeout: Wall-clock budget exceeded (→ D9
             ``engine_status="timeout"``).
-        SchematronEngineError: The worker failed to compile/transform
-            (→ D9 ``engine_status="error"``).
+        SchematronEngineError: With ``error_code="rules_invalid"`` when the
+            .sch failed to compile (an authoring problem), or with no code
+            for other engine failures.
     """
+    if not transpiler_available():
+        msg = (
+            "The SchXslt2 transpiler is not vendored into this build "
+            "(see schxslt2/README.md) — cannot compile Schematron rules."
+        )
+        raise SchematronEngineError(msg)
+
     effective_timeout = clamp(
         timeout_seconds,
         HARD_MAX_XSLT_TIMEOUT_SECONDS,
@@ -187,7 +208,7 @@ def run_transform(
         sys.executable,
         "-m",
         "validator_backends.schematron.saxon_worker",
-        str(xslt_path),
+        str(sch_path),
         str(xml_path),
         str(output_path),
     ]
@@ -207,6 +228,11 @@ def run_transform(
     except subprocess.TimeoutExpired as exc:
         raise SchematronTransformTimeout(effective_timeout) from exc
 
+    if completed.returncode == EXIT_COMPILE_ERROR:
+        stderr_tail = (completed.stderr or "").strip()[-_STDERR_TAIL_CHARS:]
+        msg = f"The Schematron rules failed to compile: {stderr_tail or 'no error detail'}"
+        raise SchematronEngineError(msg, error_code="rules_invalid")
+
     if completed.returncode != 0:
         stderr_tail = (completed.stderr or "").strip()[-_STDERR_TAIL_CHARS:]
         msg = f"Saxon transform failed: {stderr_tail or 'no error detail'}"
@@ -219,14 +245,28 @@ def run_transform(
     return output_path.read_text(encoding="utf-8")
 
 
-def saxon_engine_version() -> str:
-    """Name + version of the engine that ran, for D5 provenance."""
+def schxslt2_version() -> str:
+    """The vendored transpiler's version, from its release VERSION file."""
+    try:
+        return (SCHXSLT2_DIR / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        return "unknown"
+
+
+def engine_version() -> str:
+    """Identity of the toolchain that ran, for D5 provenance.
+
+    Both halves matter for reproducibility: SchXslt2 decides how the
+    ``.sch`` compiles, Saxon decides how the compiled XSLT executes —
+    e.g. ``"SchXslt2 1.11.1 + SaxonC-HE 12.9"``.
+    """
     try:
         from saxonche import PySaxonProcessor
 
         with PySaxonProcessor(license=False) as processor:
             # e.g. "SaxonC-HE 12.9 from Saxonica"
-            return str(processor.version).split(" from ")[0]
+            saxon = str(processor.version).split(" from ")[0]
     except Exception:
         logger.warning("Could not determine Saxon version", exc_info=True)
-        return "SaxonC-HE (unknown version)"
+        saxon = "SaxonC-HE (unknown version)"
+    return f"SchXslt2 {schxslt2_version()} + {saxon}"

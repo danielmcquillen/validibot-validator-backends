@@ -3,8 +3,9 @@ Schematron Validator Metadata.
 
 Describes the Schematron validator container for the launcher. Like SHACL,
 Schematron is light on CPU/memory — the container exists for *isolation*,
-not compute. It executes rule-pack XSLT (Saxon) over untrusted submitted
-XML, which must never run next to the worker's credentials.
+not compute. It compiles author-uploaded Schematron into XSLT (SchXslt2)
+and executes it (Saxon) over untrusted submitted XML, which must never run
+next to the worker's credentials.
 """
 
 from __future__ import annotations
@@ -12,10 +13,10 @@ from __future__ import annotations
 
 # Validator identification
 VALIDATOR_TYPE = "SCHEMATRON"
-VALIDATOR_NAME = "Schematron Rule-Pack Validator"
+VALIDATOR_NAME = "Schematron Validator"
 VALIDATOR_DESCRIPTION = (
-    "Runs curated, checksum-pinned Schematron rule packs (compiled XSLT 2.0, "
-    "e.g. EN 16931 / Peppol BIS Billing 3.0) against XML submissions using "
+    "Compiles and runs author-uploaded Schematron rules (e.g. EN 16931 / "
+    "Peppol BIS Billing 3.0 .sch files) against XML submissions using "
     "SaxonC-HE, in an isolated container."
 )
 
@@ -45,9 +46,10 @@ SUPPORTED_INPUT_TYPES = [
     "text/xml",
 ]
 
-# The compiled rule-pack XSLT arrives per run as a staged artefact reference
-# (inputs.artifact_uri + sha256) — packs are never baked into this image, so
-# a new pack version ships without rebuilding the container (ADR D4b/D5).
+# The author's Schematron rules arrive per run INLINE in the input envelope
+# (inputs.schematron_text); this container compiles them with the vendored
+# SchXslt2 transpiler (schxslt2/). No rules are ever baked into the image
+# (ADR D4b).
 REQUIRED_AUXILIARY_FILES = []
 
 # Resource requirements. Schematron is memory-light; the D8 caps in the

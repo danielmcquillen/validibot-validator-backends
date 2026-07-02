@@ -16,4 +16,4 @@ saxonche==12.9.0
 # contract + the canonical SVRL parser introduced in 0.11.0.
 # NOTE: the image cannot build until 0.11.0 is published to PyPI.
 # Pin exact version to bust Docker layer cache on upgrades.
-validibot-shared==0.11.0
+validibot-shared==0.12.0

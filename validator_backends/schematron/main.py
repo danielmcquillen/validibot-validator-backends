@@ -1,12 +1,14 @@
 """Schematron validator container entrypoint for Cloud Run Jobs / Docker.
 
-Loads a ``SchematronInputEnvelope``, runs the curated rule pack (Saxon
-XSLT over the submitted XML) in this isolated process, writes a
-``SchematronOutputEnvelope`` to storage, and POSTs the callback to Django.
+Loads a ``SchematronInputEnvelope``, compiles and runs the author's rules
+(SchXslt2 transpile, then Saxon XSLT over the submitted XML) in this
+isolated process, writes a ``SchematronOutputEnvelope`` to storage, and
+POSTs the callback to Django.
 
-The isolation is the whole point: rule-pack XSLT executes over untrusted
-submitted XML only ever in this container, which has no database, no
-secrets, and a locked-down service account (ADR-2026-07-01 D4/D8).
+The isolation is the whole point: author-supplied rules become XSLT that
+executes over untrusted submitted XML only ever in this container, which
+has no database, no secrets, and a locked-down service account
+(ADR-2026-07-01 D4/D8).
 """
 
 from __future__ import annotations
@@ -46,10 +48,9 @@ def main() -> int:
     try:
         input_envelope = load_input_envelope(SchematronInputEnvelope)
         logger.info(
-            "Loaded Schematron input envelope for run_id=%s pack=%s@%s",
+            "Loaded Schematron input envelope for run_id=%s rules_sha256=%s",
             input_envelope.run_id,
-            input_envelope.inputs.pack_id,
-            input_envelope.inputs.pack_version,
+            input_envelope.inputs.schematron_sha256,
         )
 
         result = run_schematron_validation(input_envelope)
@@ -105,10 +106,7 @@ def main() -> int:
                     messages=[
                         ValidationMessage(
                             severity=Severity.ERROR,
-                            text=(
-                                "Schematron validator failed. "
-                                "Please retry or contact support."
-                            ),
+                            text=("Schematron validator failed. Please retry or contact support."),
                         ),
                     ],
                     outputs=None,

@@ -10,22 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - New **Schematron validator backend** (`validator_backends/schematron/`,
-  image `validibot-validator-backend-schematron`) per ADR-2026-07-01: runs
-  curated, checksum-pinned Schematron rule packs (compiled XSLT 2.0, e.g.
-  EN 16931 / Peppol BIS Billing 3.0) over XML submissions using SaxonC-HE
-  12.9 (MPL-2.0; license notices copied to `/app/THIRD_PARTY_NOTICES/`).
-  The pack artefact arrives per run as a staged reference and is
-  checksum-verified before execution; the submission is re-guarded with the
-  defusedxml posture; the transform runs in a subprocess with a hard
-  wall-clock timeout; engine failures map to the D9 taxonomy
-  (`engine_status` / `engine_error_code`) instead of fabricated findings.
+  image `validibot-validator-backend-schematron`) per ADR-2026-07-01: the
+  author's Schematron rules arrive **inline** in the input envelope
+  (`inputs.schematron_text`); the container compiles them with the vendored
+  **SchXslt2 1.11.1** transpiler (`schxslt2/transpile.xsl`, MIT — the
+  maintained successor to the retired ISO skeleton and archived SchXslt 1;
+  see `schxslt2/README.md` for provenance) and runs the resulting XSLT 3.0
+  stylesheet over the XML submission using SaxonC-HE 12.9 (MPL-2.0; both
+  license notices copied to `/app/THIRD_PARTY_NOTICES/`). The submission is
+  re-guarded with the defusedxml posture; compile-and-run executes in a
+  subprocess with a hard wall-clock timeout; failures map to the D9
+  taxonomy — including `rules_invalid` for uploaded rules that fail to
+  compile (either the transpile or the compile of the generated
+  stylesheet) — instead of fabricated findings. Verified against the real
+  OpenPeppol BIS Billing 3.0 schematron, embedded `xsl:function` helpers
+  included. The `engine` provenance field reports both toolchain halves,
+  e.g. `"SchXslt2 1.11.1 + SaxonC-HE 12.9"`.
 - `schematron` optional-dependency extra (saxonche + defusedxml) wired into
   the `just test` recipes.
 
 ### Changed
 
-- `validibot-shared` bumped to 0.11.0 (Schematron envelope contract + the
-  canonical SVRL parser).
+- `validibot-shared` bumped to 0.12.0 (inline Schematron rules contract +
+  the canonical SVRL parser).
 
 ## [0.7.1] - 2026-06-06
 
@@ -63,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Release workflow `.github/workflows/release.yml`. 
+- Release workflow `.github/workflows/release.yml`.
   On a signed tag push, the workflow verifies
   the tag signature and builds each backend image (energyplus +
   fmu) in parallel. Each image is published with full
@@ -97,7 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bump `validibot-shared` 0.6.0 → 0.7.0. 
+- Bump `validibot-shared` 0.6.0 → 0.7.0.
   Added an optional ``StepValidatorRecord.validator_backend_image_digest``
   field on the producer-side evidence manifest schema. The validator
   backends don't use the new field (they only touch
@@ -159,7 +166,7 @@ their own dispatch code or orchestration must rename to
   - `NullCallbackAuth` — no auth headers (for tests / trusted local runs).
 
   Backend selection is factory-driven off the `DEPLOYMENT_TARGET` environment
-  variable, matching the Django side (`validibot/core/api/task_auth.py`). 
+  variable, matching the Django side (`validibot/core/api/task_auth.py`).
 
 - **New environment variables** (validator Cloud Run Jobs):
   - `DEPLOYMENT_TARGET` — required; `just deploy` now passes `gcp` automatically.
