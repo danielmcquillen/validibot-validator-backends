@@ -92,12 +92,13 @@ def run_schematron_validation(
         try:
             download_file(input_envelope.input_files[0].uri, submission_path)
             sch_path.write_text(inputs.schematron_text, encoding="utf-8")
-            query_binding = engine.detect_query_binding(sch_path)
 
-            # Both inputs are untrusted: re-guard the author's RULES (D8b —
-            # they may have reached this container by a path Django's authoring
-            # guard never covered) and the submitted XML (D8a), defence in depth,
-            # before anything is handed to Saxon.
+            # Both inputs are untrusted, and NOTHING must parse them before the
+            # guards run. Guard the author's RULES (D8b — they may have reached
+            # this container by a path Django's authoring guard never covered)
+            # and the submitted XML (D8a) FIRST, so the size/depth caps and the
+            # defusedxml posture apply before any parse — including the
+            # provenance detection below and Saxon's compile. Defence in depth.
             engine.guard_rules(
                 sch_path,
                 max_bytes=inputs.max_input_bytes,
@@ -108,6 +109,11 @@ def run_schematron_validation(
                 max_bytes=inputs.max_input_bytes,
                 max_depth=inputs.max_input_depth,
             )
+
+            # Provenance only AFTER the rules source has passed the hardening
+            # check — detect_query_binding parses the .sch, so an oversize or
+            # over-deep document must be rejected by guard_rules first.
+            query_binding = engine.detect_query_binding(sch_path)
             # ``xslt_timeout_seconds`` is enforced per run (the worker
             # subprocess's wall-clock). ``inputs.max_memory_mb`` is deliberately
             # NOT enforced here: memory is bounded at the container level by the

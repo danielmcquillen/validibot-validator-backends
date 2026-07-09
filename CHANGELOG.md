@@ -57,12 +57,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `engine.guard_rules()` re-applies the hardened-XML posture — defusedxml's
   no-DTD / no-entities / no-external-references stance, the ISO Schematron
   root-element check, and the size/depth caps — to the author's `.sch`
-  **before Saxon compiles it**, raising `rules_invalid` on a violation. The
-  runner already re-guarded the submitted XML (D8a); it now guards the rules
-  too (D8b), so a hostile rules document that reaches the container by any path
-  (a forged envelope, an import/admin-created ruleset, a future non-form
-  authoring surface) fails deterministically at this pre-guard rather than
-  relying on Saxon's incidental rejection of a DTD.
+  **before anything parses it** (provenance detection *and* Saxon's compile),
+  raising `rules_invalid` on a violation. The runner already re-guarded the
+  submitted XML (D8a); it now guards the rules too (D8b), so a hostile rules
+  document that reaches the container by any path (a forged envelope, an
+  import/admin-created ruleset, a future non-form authoring surface) fails
+  deterministically at this pre-guard rather than relying on Saxon's incidental
+  rejection of a DTD.
 
 ## [0.7.1] - 2026-06-06
 
