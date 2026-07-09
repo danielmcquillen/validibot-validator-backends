@@ -51,16 +51,19 @@ The core Validibot platform triggers these backends, passes input via the standa
 
 ## Available Validator Backends
 
-| Validator      | Description                                    | Use Cases                                                        |
-| -------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
-| **EnergyPlus™** | Validates and simulates building energy models | IDF/epJSON schema validation, simulation runs, energy metrics    |
-| **FMU**        | Validates and probes Functional Mock-up Units  | FMU structure validation, variable discovery, simulation testing |
+| Validator | Description | Use Cases |
+| --- | --- | --- |
+| **EnergyPlus™** | Validates and simulates building energy models | IDF/epJSON simulation runs, EnergyPlus output metrics, model safety scanning |
+| **FMU** | Validates and executes Functional Mock-up Units | FMU structure validation, variable discovery, bounded simulation testing |
+| **SHACL** | Validates RDF graphs in an isolated container | RDF parsing, SHACL shapes, SHACL-AF/SPARQL isolation, semantic model checks |
+| **Schematron** | Validates XML documents against Schematron rules | Peppol/EN 16931-style business rules, SVRL findings, XSLT isolation |
 
 ## How It Works
 
 Validator backends receive work via a standardized "envelope" containing:
 
 - **Input files** — URIs to files being validated (GCS or local filesystem)
+- **Resource files** — managed auxiliary files such as weather data, model files, or future reusable rule packs
 - **Configuration** — Validator-specific settings (e.g., simulation timestep)
 - **Context** — Callback URL, execution bundle location, timeout settings
 
@@ -70,6 +73,25 @@ After running validation, the backend writes an output envelope with:
 - **Messages** — Validation findings (errors, warnings, info)
 - **Metrics** — Numeric results (e.g., EUI for building models)
 - **Artifacts** — Generated files (reports, logs, etc.)
+
+### File Ports
+
+The envelope fields `input_files` and `resource_files` are the wire format.
+The platform-level contract should be designed as **file ports** with explicit
+roles, cardinality, accepted formats, and allowed sources.
+
+Current backend ports:
+
+| Backend | Ports today | Notes |
+| --- | --- | --- |
+| EnergyPlus | `primary_model 1..1` rendered as `input_files[role=primary-model]`; `weather_file 1..1` rendered as `resource_files[type=energyplus_weather]` | Legacy uploaded weather may still appear as `input_files[role=weather]`. |
+| FMU | `fmu_model 1..1` rendered as `input_files[role=fmu]` | Source may be a library FMU model or a step-owned workflow resource. |
+| SHACL | `data_graph 1..1` rendered as an RDF input file; shapes and ontology currently travel inline in typed `inputs` | Future large/reusable shapes or ontologies should become declared resource/artifact ports. |
+| Schematron | `xml_document 1..1` rendered as an XML input file; Schematron rules currently travel inline in typed `inputs` | Future generated or reusable `.sch` files should become declared resource/artifact ports. |
+
+Backend code should read files by role, and by future optional `port_key` when
+available. Do not add new backends that depend on `input_files[0]` without also
+validating that the declared contract has exactly one compatible file.
 
 ## Important Disclaimers
 
