@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-09
+
 ### Added
 
 - New **Schematron validator backend** (`validator_backends/schematron/`,
@@ -33,12 +35,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `validibot-shared` bumped to 0.12.0 (inline Schematron rules contract +
   the canonical SVRL parser).
+- Clarified that `SchematronInputs.max_memory_mb` is advisory per run:
+  Schematron memory is bounded at the container level by the Cloud Run Job's
+  `--memory` allocation, not enforced per run (documented in
+  `schematron/runner.py`). Timeout protection remains per-run (the worker
+  subprocess wall-clock).
 
 ### Fixed
 
-- Schematron's Saxon worker now denies URI retrieval protocols instead of
-  allowing `file://`, so author-uploaded rules cannot use `doc()` or related
-  functions to read arbitrary container-local XML into SVRL output.
+- `schematron` added to the justfile `validators` list, so `build-all` /
+  `build-push-all` / `deploy-all` and the release CI matrix build and ship the
+  Schematron backend image instead of silently skipping it.
+
+### Security
+
+- Schematron's Saxon worker denies URI-retrieval protocols
+  (`allowedProtocols=""`) instead of allowing `file://`, so author-uploaded
+  rules cannot use `doc()`, `document()`, `unparsed-text()`, or `collection()`
+  to read arbitrary container-local files — or reach out over `http://`
+  (SSRF) — and copy the result into SVRL output.
+- New `engine.guard_rules()` re-applies the hardened-XML posture — defusedxml's
+  no-DTD / no-entities / no-external-references stance, the ISO Schematron
+  root-element check, and the size/depth caps — to the author's `.sch`
+  **before Saxon compiles it**, raising `rules_invalid` on a violation. The
+  runner already re-guarded the submitted XML (D8a); it now guards the rules
+  too (D8b), so a hostile rules document that reaches the container by any path
+  (a forged envelope, an import/admin-created ruleset, a future non-form
+  authoring surface) fails deterministically at this pre-guard rather than
+  relying on Saxon's incidental rejection of a DTD.
 
 ## [0.7.1] - 2026-06-06
 

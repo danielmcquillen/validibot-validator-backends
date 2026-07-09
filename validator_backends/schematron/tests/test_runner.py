@@ -186,6 +186,37 @@ def test_xxe_submission_is_blocked_and_never_reaches_saxon(tmp_path):
     assert "forbidden constructs" in result.outputs.engine_message
 
 
+def test_hostile_rules_are_rejected_by_the_runner_as_rules_invalid(tmp_path):
+    """A hostile ``.sch`` is refused by the runner's pre-guard, before Saxon.
+
+    Proves ``engine.guard_rules`` is wired into ``run_schematron_validation``:
+    a rules document carrying a DTD/XXE (which could reach the container by a
+    path Django's form guard never covered) maps to the D9 failure taxonomy —
+    ``engine_status="error"``, ``engine_error_code="rules_invalid"``,
+    ``passed=None`` — with no fabricated rule findings and no leak. Needs no
+    transpiler, because the guard runs before compile-and-run.
+    """
+    submission = tmp_path / "ok.xml"
+    submission.write_text("<order/>", encoding="utf-8")
+    hostile_rules = (
+        '<?xml version="1.0"?>'
+        '<!DOCTYPE schema [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>'
+        '<schema xmlns="http://purl.oclc.org/dsdl/schematron"><pattern>'
+        '<rule context="/"><assert test="false()">&xxe;</assert>'
+        "</rule></pattern></schema>"
+    )
+
+    result = run_schematron_validation(
+        _envelope(submission, schematron_text=hostile_rules),
+    )
+
+    assert result.status == ValidationStatus.FAILED_RUNTIME
+    assert result.outputs.engine_status == "error"
+    assert result.outputs.engine_error_code == "rules_invalid"
+    assert result.outputs.passed is None
+    assert result.outputs.findings == []
+
+
 def test_transform_timeout_maps_to_engine_status_timeout(monkeypatch):
     """A wall-clock timeout surfaces as engine_status="timeout" (D8/D9).
 

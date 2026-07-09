@@ -94,11 +94,25 @@ def run_schematron_validation(
             sch_path.write_text(inputs.schematron_text, encoding="utf-8")
             query_binding = engine.detect_query_binding(sch_path)
 
+            # Both inputs are untrusted: re-guard the author's RULES (D8b —
+            # they may have reached this container by a path Django's authoring
+            # guard never covered) and the submitted XML (D8a), defence in depth,
+            # before anything is handed to Saxon.
+            engine.guard_rules(
+                sch_path,
+                max_bytes=inputs.max_input_bytes,
+                max_depth=inputs.max_input_depth,
+            )
             engine.guard_submission(
                 submission_path,
                 max_bytes=inputs.max_input_bytes,
                 max_depth=inputs.max_input_depth,
             )
+            # ``xslt_timeout_seconds`` is enforced per run (the worker
+            # subprocess's wall-clock). ``inputs.max_memory_mb`` is deliberately
+            # NOT enforced here: memory is bounded at the container level by the
+            # Cloud Run Job's ``--memory`` allocation, so the per-run field is
+            # advisory. An OOM surfaces as an engine error (D9), never a hang.
             svrl_text = engine.run_schematron(
                 sch_path,
                 submission_path,

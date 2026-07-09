@@ -50,6 +50,10 @@ HARD_MAX_FINDINGS = 2000
 # Tail of worker stderr surfaced in engine error messages.
 _STDERR_TAIL_CHARS = 500
 
+# The ISO Schematron namespace an author's .sch root must declare (mirrors the
+# community authoring guard in validators/schematron/security.py).
+SCHEMATRON_NS = "http://purl.oclc.org/dsdl/schematron"
+
 
 class SchematronEngineError(Exception):
     """An engine-level failure: the rules were NOT run (D9).
@@ -145,6 +149,66 @@ def guard_submission(
         if depth > effective_max_depth:
             msg = f"XML submission nests deeper than the maximum ({effective_max_depth} levels)."
             raise SchematronEngineError(msg)
+        stack.extend((child, depth + 1) for child in element)
+
+
+def guard_rules(
+    sch_path: Path,
+    *,
+    max_bytes: int,
+    max_depth: int,
+) -> None:
+    """Re-apply the hardened-XML posture to the author's rules before Saxon (D8b).
+
+    The rules are the second untrusted input (compiled Schematron is XSLT). Django
+    validates uploaded rules at authoring time, but that guard is on the step-config
+    form path ONLY — a ruleset created by import/admin, or a hand-crafted envelope,
+    could carry a ``.sch`` Django never checked. And the rules document is XML too,
+    so it can smuggle its own XXE / entity bomb / DTD.
+
+    This makes the container reject such rules with a deterministic, clearly-labelled
+    ``rules_invalid`` BEFORE Saxon ever parses them, rather than leaning on Saxon's
+    incidental (and opaquely-reported) rejection of DTDs. The same defusedxml stance
+    as :func:`guard_submission` plus the authoring-time root-element check.
+
+    Raises:
+        SchematronEngineError: ``error_code="rules_invalid"`` — the rules could not
+            be accepted. That is an authoring problem (D9), never a fact about the
+            submitted document.
+    """
+    effective_max_bytes = clamp(max_bytes, HARD_MAX_INPUT_BYTES, default=HARD_MAX_INPUT_BYTES)
+    effective_max_depth = clamp(max_depth, HARD_MAX_INPUT_DEPTH, default=HARD_MAX_INPUT_DEPTH)
+
+    size = sch_path.stat().st_size
+    if size > effective_max_bytes:
+        msg = f"Schematron rules are too large ({size:,} bytes > {effective_max_bytes:,} bytes)."
+        raise SchematronEngineError(msg, error_code="rules_invalid")
+
+    try:
+        root = SafeET.fromstring(sch_path.read_bytes(), forbid_dtd=True)
+    except (EntitiesForbidden, ExternalReferenceForbidden, DTDForbidden) as exc:
+        msg = (
+            "Schematron rules contain forbidden constructs (entities, external "
+            "references, or DTD declarations)."
+        )
+        raise SchematronEngineError(msg, error_code="rules_invalid") from exc
+    except SafeET.ParseError as exc:
+        msg = f"Schematron rules are not well-formed XML: {exc}"
+        raise SchematronEngineError(msg, error_code="rules_invalid") from exc
+
+    if root.tag != f"{{{SCHEMATRON_NS}}}schema":
+        msg = (
+            "Uploaded rules are not a Schematron schema — the root element must be "
+            f"<schema> in the ISO Schematron namespace ({SCHEMATRON_NS})."
+        )
+        raise SchematronEngineError(msg, error_code="rules_invalid")
+
+    stack = [(root, 1)]
+    while stack:
+        element, depth = stack.pop()
+        if depth > effective_max_depth:
+            msg = f"Schematron rules nest deeper than the maximum ({effective_max_depth} levels)."
+            raise SchematronEngineError(msg, error_code="rules_invalid")
         stack.extend((child, depth + 1) for child in element)
 
 

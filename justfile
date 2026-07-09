@@ -48,8 +48,9 @@ ar_repo := ar_host + "/" + gcp_project + "/validibot"
 # Git SHA for tagging
 git_sha := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
 
-# Available validators
-validators := "energyplus fmu shacl"
+# Available validators (drives build-all / build-push-all / deploy-all and the
+# release CI matrix — a validator omitted here is silently skipped by those).
+validators := "energyplus fmu shacl schematron"
 
 # =============================================================================
 # Default - List Commands
