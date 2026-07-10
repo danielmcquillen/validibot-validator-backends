@@ -38,8 +38,8 @@ classifiers = [
 dependencies = [
     "pydantic==2.13.4",
     "httpx==0.28.1",
-    "google-cloud-storage==3.12.0",
-    "google-auth==2.55.1",
+    "google-cloud-storage==3.12.1",
+    "google-auth==2.55.2",
     "requests==2.34.2",
     "sentry-sdk==2.64.0",
     "validibot-shared==0.12.0",
@@ -50,8 +50,8 @@ dev = [
     "pytest==9.1.1",
     "pytest-mock==3.15.1",
     "pytest-cov==7.1.0",
-    "ruff==0.15.20",
-    "mypy==2.1.0",
+    "ruff==0.15.21",
+    "mypy==2.2.0",
 ]
 
 # EnergyPlus validator dependencies (for local dev/testing)
@@ -60,14 +60,14 @@ energyplus = [
 ]
 
 # FMU validator dependencies (for local dev/testing)
-fmu = ["fmpy==0.3.29"]
+fmu = ["fmpy==0.3.30"]
 
 # SHACL validator dependencies (for local dev/testing). Pinned to match the
 # community validibot repo so behaviour is identical across the boundary.
 shacl = [
     "rdflib==7.6.0",
-    "pyshacl==0.31.0",
-    "owlrl==7.1.4",
+    "pyshacl==0.40.0",
+    "owlrl==7.6.2",
     "defusedxml==0.7.1",
     "lxml==6.1.1",
 ]
