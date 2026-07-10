@@ -76,7 +76,7 @@ shacl = [
 # the chosen XSLT 2.0 engine (ADR-2026-07-01 D4, MPL-2.0); defusedxml pins
 # match the community repo's hardened-XML guard.
 schematron = [
-    "saxonche==13.0.0",
+    "saxonche==12.9.0",
     "defusedxml==0.7.1",
 ]
 
