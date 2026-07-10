@@ -156,7 +156,9 @@ jobs:
       # debugging a release want to see all the failure modes at once.
       fail-fast: false
       matrix:
-        validator: [energyplus, fmu]
+        # Keep in sync with `validators` in the justfile — every validator
+        # that ships as a container must be published to GHCR on release.
+        validator: [energyplus, fmu, shacl, schematron]
 
     permissions:
       # Required for OIDC token exchange (used by GHCR push, GCP
