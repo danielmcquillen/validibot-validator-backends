@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-07-10
+
+### Changed
+
+- Dependency refresh across the validators: `pyshacl` 0.31.0 → 0.40.0,
+  `owlrl` 7.1.4 → 7.6.2, `rdflib` 7.6.0, `lxml` 6.1.1, `fmpy` 0.3.29 → 0.3.30,
+  plus `google-cloud-storage`, `google-auth`, `ruff`, `mypy`, and the pinned
+  GitHub Actions used in CI and the release workflow.
+
+### Fixed
+
+- **CI dependency resolution.** Bumped the CI-pinned `uv` from 0.5.16 to
+  0.11.19 so the job-level `UV_NO_SOURCES=1` is actually honored. The old
+  `uv` predated that environment variable and silently ignored it, so
+  `uv sync` tried to resolve the local `../validibot-shared` path source
+  (absent on the runner) instead of the published `validibot-shared` from
+  the index, failing every CI run.
+- **FMU integration tests** now `pytest.skip` cleanly when the gitignored
+  `*.fmu` fixtures are absent (as in CI) instead of failing on a missing
+  asset. They stay real integration tests where the fixtures exist locally.
+
+### Notes
+
+- **`saxonche` remains pinned at 12.9.0.** SaxonC-HE 13 tightens
+  `allowedProtocols` enforcement so the vendored SchXslt2 transpiler can no
+  longer be read under the in-process security lockdown (ADR-2026-07-01 D8b),
+  which breaks the Schematron transform. Upgrading requires reworking
+  `saxon_worker.py` to load its trusted stylesheets as strings rather than by
+  file path; deferred to a future release.
+
 ## [0.9.0] - 2026-07-09
 
 ### Added
