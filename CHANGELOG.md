@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-07-10
+
+### Changed
+
+- Publish shacl and schematron images (were missing from the matrix)
+
 ## [0.9.1] - 2026-07-10
 
 ### Changed
+
 
 - Dependency refresh across the validators: `pyshacl` 0.31.0 → 0.40.0,
   `owlrl` 7.1.4 → 7.6.2, `rdflib` 7.6.0, `lxml` 6.1.1, `fmpy` 0.3.29 → 0.3.30,
