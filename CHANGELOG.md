@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Align validator container requirements with `pyproject.toml`: refresh
+  `google-cloud-storage`, `google-auth`, FMU's `fmpy`, the SHACL RDF stack, and
+  the Docker-cache-busting `validibot-shared==0.12.1` pin used by every backend.
+
 ## [0.9.2] - 2026-07-10
 
 ### Changed

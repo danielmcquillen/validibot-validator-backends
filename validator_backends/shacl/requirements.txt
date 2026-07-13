@@ -5,17 +5,17 @@
 # matches what authors test against. Keep these in lockstep on every bump.
 pydantic==2.13.4
 httpx==0.28.1
-google-cloud-storage==3.12.0
-google-auth==2.55.1
+google-cloud-storage==3.12.1
+google-auth==2.55.2
 defusedxml==0.7.1
 
 # RDF / SHACL stack (matches validibot community pins).
 rdflib==7.6.0
-pyshacl==0.31.0
-owlrl==7.1.4
-# lxml: kept >=6.1.0 (CVE-2026-41066 XXE fix). Not on the SHACL critical path
-# — rdflib uses its own SAX parser and we layer defusedxml + the XXE regex in
-# front — but it ships as an rdflib/lxml dependency, so we pin the patched ver.
+pyshacl==0.40.0
+owlrl==7.6.2
+# lxml: pin a version at or above the 6.1.0 CVE-2026-41066 XXE fix. It is not
+# on the SHACL critical path: rdflib uses its own SAX parser and we layer
+# defusedxml + the XXE regex in front, but lxml ships as an rdflib dependency.
 lxml==6.1.1
 
 # Validibot shared library (from PyPI).
