@@ -1,0 +1,45 @@
+schema_version = 1
+
+[[backend]]
+slug = "energyplus"
+dockerfile = "validator_backends/energyplus/Dockerfile"
+requirements = "validator_backends/energyplus/requirements.txt"
+test_path = "validator_backends/energyplus/tests"
+version_source = "validator_backends/energyplus/__metadata__.py"
+image_name = "validibot-validator-backend-energyplus"
+shared_contract = "0.12.1"
+platforms = ["linux/amd64"]
+release = true
+
+[[backend]]
+slug = "fmu"
+dockerfile = "validator_backends/fmu/Dockerfile"
+requirements = "validator_backends/fmu/requirements.txt"
+test_path = "validator_backends/fmu/tests"
+version_source = "validator_backends/fmu/__metadata__.py"
+image_name = "validibot-validator-backend-fmu"
+shared_contract = "0.12.1"
+platforms = ["linux/amd64"]
+release = true
+
+[[backend]]
+slug = "shacl"
+dockerfile = "validator_backends/shacl/Dockerfile"
+requirements = "validator_backends/shacl/requirements.txt"
+test_path = "validator_backends/shacl/tests"
+version_source = "validator_backends/shacl/__metadata__.py"
+image_name = "validibot-validator-backend-shacl"
+shared_contract = "0.12.1"
+platforms = ["linux/amd64"]
+release = true
+
+[[backend]]
+slug = "schematron"
+dockerfile = "validator_backends/schematron/Dockerfile"
+requirements = "validator_backends/schematron/requirements.txt"
+test_path = "validator_backends/schematron/tests"
+version_source = "validator_backends/schematron/__metadata__.py"
+image_name = "validibot-validator-backend-schematron"
+shared_contract = "0.12.1"
+platforms = ["linux/amd64"]
+release = true
