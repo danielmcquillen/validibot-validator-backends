@@ -64,9 +64,7 @@ def test_manifest_schema_and_paths_are_valid():
 
 def test_manifest_matches_release_and_developer_matrices():
     """Release and justfile membership must stay in sync with the manifest."""
-    release_slugs = [
-        backend["slug"] for backend in _backends() if backend.get("release") is True
-    ]
+    release_slugs = [backend["slug"] for backend in _backends() if backend.get("release") is True]
 
     assert _release_slugs() == release_slugs
     assert _justfile_slugs() == release_slugs

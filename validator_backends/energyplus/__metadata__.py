@@ -57,7 +57,9 @@ SUPPORTED_INPUT_TYPES = [
 # Required auxiliary files
 REQUIRED_AUXILIARY_FILES = [
     {
+        "port_key": "weather_file",
         "role": "weather",
+        "type": "energyplus_weather",
         "mime_type": "application/vnd.energyplus.epw",
         "description": "EnergyPlus weather file (.epw)",
     },

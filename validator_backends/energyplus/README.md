@@ -38,12 +38,15 @@ This container:
       "name": "model.idf",
       "mime_type": "application/vnd.energyplus.idf",
       "role": "primary-model",
+      "port_key": "primary_model",
       "uri": "gs://bucket/models/model.idf"
-    },
+    }
+  ],
+  "resource_files": [
     {
-      "name": "weather.epw",
-      "mime_type": "application/vnd.energyplus.epw",
-      "role": "weather",
+      "id": "weather-resource-uuid",
+      "type": "energyplus_weather",
+      "port_key": "weather_file",
       "uri": "gs://bucket/weather/USA_CA_SF.epw"
     }
   ],

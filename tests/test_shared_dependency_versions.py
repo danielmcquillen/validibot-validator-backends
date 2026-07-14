@@ -21,6 +21,7 @@ VALIDATOR_REQUIREMENTS = (
     REPO_ROOT / "validator_backends" / "energyplus" / "requirements.txt",
     REPO_ROOT / "validator_backends" / "fmu" / "requirements.txt",
     REPO_ROOT / "validator_backends" / "shacl" / "requirements.txt",
+    REPO_ROOT / "validator_backends" / "schematron" / "requirements.txt",
 )
 SHARED_PIN_PATTERN = re.compile(r"^validibot-shared==(?P<version>[^\s#]+)$", re.MULTILINE)
 

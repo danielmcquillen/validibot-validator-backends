@@ -72,8 +72,7 @@ EXPECTED_WARNING_IDS = (
 requires_transpiler = pytest.mark.skipif(
     not engine.transpiler_available(),
     reason=(
-        "SchXslt2 transpiler not vendored — see "
-        "validator_backends/schematron/schxslt2/README.md"
+        "SchXslt2 transpiler not vendored — see validator_backends/schematron/schxslt2/README.md"
     ),
 )
 
