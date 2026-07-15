@@ -75,7 +75,7 @@ def main() -> int:
             },
             messages=[],
             metrics=[],
-            artifacts=[],
+            artifacts=artifacts,
             outputs=outputs,
             raw_outputs=raw_outputs,
         )
