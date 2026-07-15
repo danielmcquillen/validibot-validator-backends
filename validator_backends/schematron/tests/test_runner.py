@@ -64,6 +64,7 @@ def _envelope(
     *,
     schematron_text: str = SCH_TEXT,
     xslt_timeout_seconds: int = 60,
+    execution_bundle_uri: str = "file:///tmp/run-1/",
 ) -> SchematronInputEnvelope:
     """Build an input envelope over a file:// submission (no storage backend)."""
     return SchematronInputEnvelope(
@@ -86,7 +87,7 @@ def _envelope(
         ),
         context={
             "callback_url": "https://example.com/callback",
-            "execution_bundle_uri": "file:///tmp/run-1/",
+            "execution_bundle_uri": execution_bundle_uri,
             "skip_callback": True,
         },
     )
@@ -114,6 +115,7 @@ def test_valid_invoice_passes_with_full_provenance():
     assert "SchXslt2" in outputs.engine
     assert "Saxon" in outputs.engine
     assert outputs.execution_seconds > 0
+    assert "<svrl:schematron-output" in result.svrl_text
 
 
 @requires_transpiler
@@ -138,6 +140,7 @@ def test_invalid_invoice_fails_vb_co_15_with_the_d2_signal_shape():
     assert finding.severity == "ERROR"
     assert finding.flag == "fatal"
     assert "LegalMonetaryTotal" in finding.location_xpath
+    assert "VB-CO-15" in result.svrl_text
 
     # The generic messages list carries the same finding for consumers that
     # never look inside outputs.
@@ -166,6 +169,7 @@ def test_uncompilable_rules_map_to_rules_invalid():
     assert outputs.passed is None
     assert outputs.findings == []
     assert outputs.finding_rule_ids_by_severity == {}
+    assert result.svrl_text == ""
 
 
 def test_xxe_submission_is_blocked_and_never_reaches_saxon(tmp_path):
@@ -257,7 +261,11 @@ def test_main_entrypoint_round_trips_the_envelope(tmp_path, monkeypatch):
     """
     from validator_backends.schematron import main as schematron_main
 
-    envelope = _envelope(FIXTURES / "invoice_invalid.xml")
+    bundle_dir = tmp_path / "bundle"
+    envelope = _envelope(
+        FIXTURES / "invoice_invalid.xml",
+        execution_bundle_uri=f"file://{bundle_dir}",
+    )
     input_path = tmp_path / "input.json"
     input_path.write_text(envelope.model_dump_json(), encoding="utf-8")
     output_path = tmp_path / "output.json"
@@ -274,3 +282,12 @@ def test_main_entrypoint_round_trips_the_envelope(tmp_path, monkeypatch):
     assert output.status == ValidationStatus.FAILED_VALIDATION
     assert output.outputs.engine_status == "ok"
     assert output.outputs.finding_rule_ids_by_severity == {"VB-CO-15": "ERROR"}
+    assert output.artifacts
+    artifact = output.artifacts[0]
+    assert artifact.name == "report.svrl"
+    assert artifact.type == "svrl-report"
+    assert artifact.mime_type == "application/xml"
+    assert artifact.uri.endswith("/bundle/outputs/report.svrl")
+    assert "VB-CO-15" in (bundle_dir / "outputs" / "report.svrl").read_text(
+        encoding="utf-8",
+    )

@@ -19,6 +19,7 @@ from validator_backends.core.callback_client import post_callback
 from validator_backends.core.envelope_loader import get_output_uri, load_input_envelope
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_envelope
+from validator_backends.core.report_artifacts import upload_text_report_artifact
 from validator_backends.shacl.runner import run_shacl_validation
 from validibot_shared.shacl.envelopes import SHACLInputEnvelope, SHACLOutputEnvelope
 from validibot_shared.validations.envelopes import (
@@ -50,6 +51,7 @@ def main() -> int:
 
         result = run_shacl_validation(input_envelope)
         finished_at = datetime.now(UTC)
+        artifacts = _upload_report_artifacts(input_envelope, result.outputs)
 
         output_envelope = SHACLOutputEnvelope(
             run_id=input_envelope.run_id,
@@ -58,7 +60,7 @@ def main() -> int:
             timing={"started_at": started_at, "finished_at": finished_at},
             messages=result.messages,
             metrics=[],
-            artifacts=[],
+            artifacts=artifacts,
             outputs=result.outputs,
         )
 
@@ -123,6 +125,28 @@ def main() -> int:
         except Exception:
             logger.exception("Failed to send SHACL failure callback")
         return 1
+
+
+def _upload_report_artifacts(input_envelope: SHACLInputEnvelope, outputs):
+    """Upload SHACL report bytes for Django artifact indexing."""
+
+    report = getattr(outputs, "results_graph_turtle", "") if outputs else ""
+    if not report:
+        return []
+
+    try:
+        artifact = upload_text_report_artifact(
+            content=report,
+            execution_bundle_uri=str(input_envelope.context.execution_bundle_uri),
+            filename="shacl-report.ttl",
+            artifact_type="shacl-report",
+            mime_type="text/turtle",
+        )
+    except Exception:
+        logger.exception("Failed to upload SHACL report artifact; continuing without it")
+        return []
+
+    return [artifact] if artifact else []
 
 
 if __name__ == "__main__":

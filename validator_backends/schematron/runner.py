@@ -74,6 +74,7 @@ class SchematronRunResult(NamedTuple):
     status: ValidationStatus
     messages: list[ValidationMessage]
     outputs: SchematronOutputs
+    svrl_text: str = ""
 
 
 def run_schematron_validation(
@@ -192,6 +193,7 @@ def run_schematron_validation(
         status=status,
         messages=_messages_from_outputs(outputs),
         outputs=outputs,
+        svrl_text=svrl_text,
     )
 
 

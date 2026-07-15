@@ -100,4 +100,3 @@ def test_main_includes_uploaded_artifacts_in_output_envelope(monkeypatch, tmp_pa
     output = captured["envelope"]
     assert output.artifacts == [uploaded_artifact]
     assert output.raw_outputs == raw_outputs
-

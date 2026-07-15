@@ -21,6 +21,7 @@ from validator_backends.core.callback_client import post_callback
 from validator_backends.core.envelope_loader import get_output_uri, load_input_envelope
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_envelope
+from validator_backends.core.report_artifacts import upload_text_report_artifact
 from validator_backends.schematron.runner import run_schematron_validation
 from validibot_shared.schematron.envelopes import (
     SchematronInputEnvelope,
@@ -55,6 +56,7 @@ def main() -> int:
 
         result = run_schematron_validation(input_envelope)
         finished_at = datetime.now(UTC)
+        artifacts = _upload_report_artifacts(input_envelope, result.svrl_text)
 
         output_envelope = SchematronOutputEnvelope(
             run_id=input_envelope.run_id,
@@ -63,7 +65,7 @@ def main() -> int:
             timing={"started_at": started_at, "finished_at": finished_at},
             messages=result.messages,
             metrics=[],
-            artifacts=[],
+            artifacts=artifacts,
             outputs=result.outputs,
         )
 
@@ -128,6 +130,29 @@ def main() -> int:
         except Exception:
             logger.exception("Failed to send Schematron failure callback")
         return 1
+
+
+def _upload_report_artifacts(input_envelope: SchematronInputEnvelope, svrl_text: str):
+    """Upload SVRL report bytes for Django artifact indexing."""
+
+    if not svrl_text:
+        return []
+
+    try:
+        artifact = upload_text_report_artifact(
+            content=svrl_text,
+            execution_bundle_uri=str(input_envelope.context.execution_bundle_uri),
+            filename="report.svrl",
+            artifact_type="svrl-report",
+            mime_type="application/xml",
+        )
+    except Exception:
+        logger.exception(
+            "Failed to upload Schematron SVRL artifact; continuing without it",
+        )
+        return []
+
+    return [artifact] if artifact else []
 
 
 if __name__ == "__main__":
