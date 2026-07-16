@@ -88,7 +88,7 @@ _EMBEDDED_SPARQL_FORBIDDEN_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Well-known building-domain namespaces (coarse routing signals for CEL).
+# Well-known building-domain namespaces (coarse routing output_values for CEL).
 NS_S223 = "http://data.ashrae.org/standard223#"
 NS_G36 = "http://data.ashrae.org/standard223/1.0/extensions/g36#"
 NS_BRICK = "https://brickschema.org/schema/Brick#"
@@ -836,19 +836,19 @@ def _shacl_code_from_constraint(constraint_uri: Any) -> str:
 
 
 # =============================================================================
-# Signal extraction
+# Output-value extraction
 # =============================================================================
 
 
-def extract_signals(
+def extract_output_values(
     data_graph: Graph | None,
     results_graph: Graph | None,
     *,
     parse_ok: bool,
     parse_serialization: str,
 ) -> dict[str, Any]:
-    """Compute the ``o.*`` output signal dict for CEL assertions."""
-    signals: dict[str, Any] = {
+    """Compute the ``o.*`` output output-value dict for CEL assertions."""
+    output_values: dict[str, Any] = {
         "parse_ok": parse_ok,
         "parse_serialization": parse_serialization,
         "triple_count": len(data_graph) if data_graph is not None else 0,
@@ -864,27 +864,27 @@ def extract_signals(
 
     if data_graph is not None:
         namespaces = _collect_namespaces(data_graph)
-        signals["namespaces_present"] = sorted(namespaces)
-        signals["has_s223_namespace"] = NS_S223 in namespaces
-        signals["has_g36_namespace"] = NS_G36 in namespaces
-        signals["has_brick_namespace"] = NS_BRICK in namespaces
+        output_values["namespaces_present"] = sorted(namespaces)
+        output_values["has_s223_namespace"] = NS_S223 in namespaces
+        output_values["has_g36_namespace"] = NS_G36 in namespaces
+        output_values["has_brick_namespace"] = NS_BRICK in namespaces
 
     if results_graph is not None:
         for result_node in results_graph.objects(predicate=SH.result):
             sev = results_graph.value(result_node, SH.resultSeverity)
             if sev == SH.Violation:
-                signals["shacl_violation_count"] += 1
+                output_values["shacl_violation_count"] += 1
             elif sev == SH.Warning:
-                signals["shacl_warning_count"] += 1
+                output_values["shacl_warning_count"] += 1
             elif sev == SH.Info:
-                signals["shacl_info_count"] += 1
-        signals["shacl_total_count"] = (
-            signals["shacl_violation_count"]
-            + signals["shacl_warning_count"]
-            + signals["shacl_info_count"]
+                output_values["shacl_info_count"] += 1
+        output_values["shacl_total_count"] = (
+            output_values["shacl_violation_count"]
+            + output_values["shacl_warning_count"]
+            + output_values["shacl_info_count"]
         )
 
-    return signals
+    return output_values
 
 
 def _collect_namespaces(graph: Graph) -> set[str]:

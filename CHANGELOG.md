@@ -308,7 +308,7 @@ their own dispatch code or orchestration must rename to
 
 - **FMU runner**: Clarified that the runner consumes and returns native
   FMU variable names exactly as specified in the envelope. The core
-  Django app maps these to `SignalDefinition` rows on ingestion.
+  Django app maps these to `StepIODefinition` rows on ingestion.
 - **FMU README**: Updated to reflect native variable name contract
   (previously said "catalog-keyed inputs").
 

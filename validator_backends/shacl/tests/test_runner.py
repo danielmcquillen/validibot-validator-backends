@@ -3,7 +3,7 @@
 These drive ``run_shacl_validation(input_envelope)`` exactly as ``main`` does,
 but with a ``file://`` submission and ``skip_callback=True`` — i.e. the same path
 the local Docker (synchronous) backend and manual testing use. They confirm the
-full assembly: download → parse → pyshacl → findings/signals → result-handling →
+full assembly: download → parse → pyshacl → findings/output values → result-handling →
 SPARQL-ASK assertions → ``SHACLOutputs`` + status.
 
 Result-handling behaviour is the subtle part and is pinned explicitly:
@@ -80,7 +80,7 @@ def _envelope(tmp_path: Path, *, submission: str, inputs: SHACLInputs):
 
 
 def test_runner_conforming_graph_succeeds(tmp_path):
-    """A conforming graph yields SUCCESS, conforms=True, and the o.* signals."""
+    """A conforming graph yields SUCCESS, conforms=True, and the o.* output_values."""
     env = _envelope(
         tmp_path,
         submission=CONFORMING_TTL,
@@ -122,7 +122,7 @@ def test_runner_report_only_does_not_block(tmp_path):
     """report_only surfaces violation *counts* but keeps status SUCCESS.
 
     This mirrors the in-process engine's ``_blocking_shacl_issues`` behaviour:
-    the report and signals expose the violations, but they don't fail the step.
+    the report and output values expose the violations, but they don't fail the step.
     """
     env = _envelope(
         tmp_path,

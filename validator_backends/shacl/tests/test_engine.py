@@ -6,7 +6,7 @@ away from the worker's credentials — so the security checks (XXE refusal, JSON
 remote-context refusal, SHACL-JS rejection, advanced-feature gating, embedded
 SPARQL scrubbing, triple caps) are the most important things to pin here.
 
-The happy-path tests confirm the engine still produces the same findings, signals,
+The happy-path tests confirm the engine still produces the same findings, output_values,
 and SHACL report it did in-process, so the move to the container is behaviour-
 preserving for authors.
 
@@ -224,13 +224,13 @@ def test_run_shacl_validation_conforming():
         enable_advanced_features=False,
     )
     assert error is None
-    signals = engine.extract_signals(
+    output_values = engine.extract_output_values(
         data_graph=data,
         results_graph=results,
         parse_ok=True,
         parse_serialization="turtle",
     )
-    assert signals["shacl_violation_count"] == 0
+    assert output_values["shacl_violation_count"] == 0
 
 
 def test_run_shacl_validation_violation_maps_to_finding():

@@ -12,15 +12,15 @@ Flow (each step delegates to :mod:`engine`):
 2. Load any opted-in bundled standards (Phase 1 emits warnings).
 3. Parse the submission as RDF using the resolved ``rdf_format``.
 4. Run pyshacl with the resolved inference mode + advanced/gate flags.
-5. Map ``sh:ValidationResult`` nodes to findings; extract ``o.*`` signals.
+5. Map ``sh:ValidationResult`` nodes to findings; extract ``o.*`` output_values.
 6. Apply SHACL result handling (fail_immediately / fail_after_assertions /
    report_only).
 7. Evaluate author-defined SPARQL-ASK assertions (when result handling allows).
-8. Assemble ``SHACLOutputs`` (signals + findings + report + assertion tallies)
+8. Assemble ``SHACLOutputs`` (output values + findings + report + assertion tallies)
    and the final status.
 
 The CEL/Basic output assertions are intentionally NOT run here — they operate on
-the extracted signals (no graph access) and stay in Django, evaluated by
+the extracted output_values (no graph access) and stay in Django, evaluated by
 ``AdvancedValidator.post_execute_validate``.
 """
 
@@ -115,7 +115,7 @@ def run_shacl_validation(input_envelope: SHACLInputEnvelope) -> SHACLRunResult:
                     code="shacl.parse_failed",
                 ),
             ],
-            signals=engine.extract_signals(
+            output_values=engine.extract_output_values(
                 data_graph=None,
                 results_graph=None,
                 parse_ok=False,
@@ -151,7 +151,7 @@ def run_shacl_validation(input_envelope: SHACLInputEnvelope) -> SHACLRunResult:
                     code="shacl.engine_error",
                 ),
             ],
-            signals=engine.extract_signals(
+            output_values=engine.extract_output_values(
                 data_graph=data_graph,
                 results_graph=None,
                 parse_ok=True,
@@ -163,9 +163,9 @@ def run_shacl_validation(input_envelope: SHACLInputEnvelope) -> SHACLRunResult:
             started=started,
         )
 
-    # 4. Map findings + signals + report.
+    # 4. Map findings + output values + report.
     shacl_findings = engine.map_results_to_issues(results_graph)
-    signals = engine.extract_signals(
+    output_values = engine.extract_output_values(
         data_graph=data_graph,
         results_graph=results_graph,
         parse_ok=True,
@@ -181,7 +181,7 @@ def run_shacl_validation(input_envelope: SHACLInputEnvelope) -> SHACLRunResult:
     ):
         return _build_result(
             findings=[*bundle_warnings, *shacl_findings],
-            signals=signals,
+            output_values=output_values,
             assertion_total=0,
             assertion_failures=0,
             report_turtle=report_turtle,
@@ -204,14 +204,14 @@ def run_shacl_validation(input_envelope: SHACLInputEnvelope) -> SHACLRunResult:
     )
 
     # 7. report_only drops SHACL findings from the surfaced set (counts/report
-    # are still exposed via signals + results_graph_turtle).
+    # are still exposed via output values + results_graph_turtle).
     blocking_shacl = [] if result_handling == SHACL_RESULT_REPORT_ONLY else shacl_findings
 
     findings = [*bundle_warnings, *blocking_shacl, *sparql_findings]
 
     return _build_result(
         findings=findings,
-        signals=signals,
+        output_values=output_values,
         assertion_total=assertion_total,
         assertion_failures=assertion_failures,
         report_turtle=report_turtle,
@@ -276,7 +276,7 @@ def _status_for(findings: list[SHACLFinding]) -> ValidationStatus:
 def _build_result(
     *,
     findings: list[SHACLFinding],
-    signals: dict,
+    output_values: dict,
     assertion_total: int,
     assertion_failures: int,
     report_turtle: str,
@@ -287,19 +287,19 @@ def _build_result(
 ) -> SHACLRunResult:
     """Assemble the SHACLOutputs + messages + status from engine results."""
     outputs = SHACLOutputs(
-        conforms=signals.get("shacl_violation_count", 0) == 0,
+        conforms=output_values.get("shacl_violation_count", 0) == 0,
         findings=findings,
-        parse_ok=signals["parse_ok"],
-        parse_serialization=signals["parse_serialization"],
-        triple_count=signals["triple_count"],
-        namespaces_present=signals["namespaces_present"],
-        has_s223_namespace=signals["has_s223_namespace"],
-        has_g36_namespace=signals["has_g36_namespace"],
-        has_brick_namespace=signals["has_brick_namespace"],
-        shacl_violation_count=signals["shacl_violation_count"],
-        shacl_warning_count=signals["shacl_warning_count"],
-        shacl_info_count=signals["shacl_info_count"],
-        shacl_total_count=signals["shacl_total_count"],
+        parse_ok=output_values["parse_ok"],
+        parse_serialization=output_values["parse_serialization"],
+        triple_count=output_values["triple_count"],
+        namespaces_present=output_values["namespaces_present"],
+        has_s223_namespace=output_values["has_s223_namespace"],
+        has_g36_namespace=output_values["has_g36_namespace"],
+        has_brick_namespace=output_values["has_brick_namespace"],
+        shacl_violation_count=output_values["shacl_violation_count"],
+        shacl_warning_count=output_values["shacl_warning_count"],
+        shacl_info_count=output_values["shacl_info_count"],
+        shacl_total_count=output_values["shacl_total_count"],
         results_graph_turtle=report_turtle,
         shacl_shapes_sha256=shapes_sha,
         shacl_ontology_sha256=ontology_sha,
@@ -320,7 +320,7 @@ def _build_result(
 def _failure_result(
     *,
     findings: list[SHACLFinding],
-    signals: dict,
+    output_values: dict,
     inputs,
     shapes_sha: str,
     ontology_sha: str,
@@ -329,7 +329,7 @@ def _failure_result(
     """Build a parse/engine-failure result (FAILED_VALIDATION, no assertions)."""
     return _build_result(
         findings=findings,
-        signals=signals,
+        output_values=output_values,
         assertion_total=0,
         assertion_failures=0,
         report_turtle="",

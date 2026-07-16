@@ -3,7 +3,7 @@ FMU simulation runner for Cloud Run Jobs.
 
 Resolves the FMU from GCS, runs a simulation with fmpy, and returns outputs
 keyed by native FMU variable names (as specified in the envelope). The core
-Django app maps these back to SignalDefinition rows on ingestion.
+Django app maps these back to StepIODefinition rows on ingestion.
 """
 
 from __future__ import annotations
