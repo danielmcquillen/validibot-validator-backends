@@ -97,19 +97,19 @@ check: lint test
 # Build a validator container locally (for testing only)
 # Build context is the repo root (validibot-validator-backends/), not the validator subdirectory
 #
-# Builds for the HOST architecture by default. This recipe `--load`s the image
-# into the local Docker for local testing (e.g. the `just local-cloud` stack) —
-# it does NOT push to Cloud Run, so it should be native: on Apple Silicon an
-# amd64 image runs under QEMU emulation ~14x slower, which pushes heavy
-# validators (e.g. SHACL on a real ASHRAE 223P model: ~15s native vs ~205s
-# emulated) past their wall-clock budgets and makes them spuriously "time out"
-# locally. Cloud Run images come from `build-push` (still pinned to amd64) or CI,
-# so production is unaffected. To force a specific platform for parity testing,
-# set VALIDATOR_BUILD_PLATFORM=linux/amd64 (or any buildx platform).
+# Builds for the HOST architecture by default, except EnergyPlus. The bundled
+# upstream EnergyPlus archive is Linux x86-64-only, so that validator defaults
+# to linux/amd64 even on Apple Silicon. Other validators remain native because
+# emulation can make large SHACL runs exceed their local wall-clock budgets.
+# To force any explicit platform, set VALIDATOR_BUILD_PLATFORM.
 build validator:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "Building {{validator}} container${VALIDATOR_BUILD_PLATFORM:+ for ${VALIDATOR_BUILD_PLATFORM}}..."
+    build_platform="${VALIDATOR_BUILD_PLATFORM:-}"
+    if [[ "{{validator}}" == "energyplus" && -z "$build_platform" ]]; then
+        build_platform="linux/amd64"
+    fi
+    echo "Building {{validator}} container${build_platform:+ for ${build_platform}}..."
     # The backend image version comes from the Dockerfile's
     # ``ARG VALIDATOR_BACKEND_VERSION`` default — that's the single source of
     # truth. Release engineering can override via the env var
@@ -117,7 +117,7 @@ build validator:
     # ``${VAR:+--build-arg ...}`` form passes the build-arg only when the
     # env var is set and otherwise lets the Dockerfile default win.
     docker buildx build \
-        ${VALIDATOR_BUILD_PLATFORM:+--platform "${VALIDATOR_BUILD_PLATFORM}"} \
+        ${build_platform:+--platform "${build_platform}"} \
         --load \
         -f validator_backends/{{validator}}/Dockerfile \
         ${VALIDATOR_BACKEND_VERSION:+--build-arg VALIDATOR_BACKEND_VERSION="${VALIDATOR_BACKEND_VERSION}"} \

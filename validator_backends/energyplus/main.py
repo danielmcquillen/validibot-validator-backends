@@ -220,7 +220,11 @@ def _infer_artifact_type(name: str) -> str:
         return "simulation-db"
     if lowered.endswith(".csv"):
         return "timeseries-csv"
-    if lowered.endswith(".err"):
+    # EnergyPlus can emit multiple ``.err`` files. Only ``eplusout.err`` is
+    # the validator's declared error-log artifact; for example, ``sqlite.err``
+    # is an auxiliary file and must not collide with the single-item
+    # ``eplusout_err`` output port.
+    if Path(lowered).name == "eplusout.err":
         return "err-log"
     if lowered.endswith(".eso"):
         return "eso"
