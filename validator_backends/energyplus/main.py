@@ -20,6 +20,7 @@ from validator_backends.core.callback_client import post_callback
 from validator_backends.core.envelope_loader import get_output_uri, load_input_envelope
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_directory, upload_envelope
+from validator_backends.core.output_identity import output_identity_for
 from validibot_shared.energyplus.envelopes import (
     EnergyPlusInputEnvelope,
     EnergyPlusOutputEnvelope,
@@ -110,10 +111,13 @@ def main() -> int:
         if messages:
             logger.info("Including %d validation messages in output", len(messages))
 
+        output_uri = get_output_uri(input_envelope)
+
         # Create output envelope
         logger.info("Creating output envelope...")
         output_envelope = EnergyPlusOutputEnvelope(
             run_id=input_envelope.run_id,
+            **output_identity_for(input_envelope, output_uri),
             validator=input_envelope.validator,
             status=status,
             timing={
@@ -128,7 +132,6 @@ def main() -> int:
         )
 
         # Upload output envelope to GCS
-        output_uri = get_output_uri(input_envelope)
         logger.info("Uploading output envelope to %s", output_uri)
         upload_envelope(output_envelope, output_uri)
 
@@ -293,8 +296,10 @@ def _handle_failure(
         return exit_code
 
     finished_at = datetime.now(UTC)
+    output_uri = get_output_uri(input_envelope)
     failure_envelope = EnergyPlusOutputEnvelope(
         run_id=input_envelope.run_id,
+        **output_identity_for(input_envelope, output_uri),
         validator=input_envelope.validator,
         status=ValidationStatus.FAILED_RUNTIME,
         timing={
@@ -314,7 +319,6 @@ def _handle_failure(
         ),
     )
 
-    output_uri = get_output_uri(input_envelope)
     upload_envelope(failure_envelope, output_uri)
 
     post_callback(

@@ -16,6 +16,7 @@ from validator_backends.core.callback_client import post_callback
 from validator_backends.core.envelope_loader import get_output_uri, load_input_envelope
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_directory, upload_envelope
+from validator_backends.core.output_identity import output_identity_for
 from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUOutputEnvelope
 from validibot_shared.validations.envelopes import (
     RawOutputs,
@@ -65,8 +66,10 @@ def main() -> int:
         except Exception:
             logger.exception("Failed to upload FMU outputs; continuing without artifacts")
 
+        output_uri = get_output_uri(input_envelope)
         output_envelope = FMUOutputEnvelope(
             run_id=input_envelope.run_id,
+            **output_identity_for(input_envelope, output_uri),
             validator=input_envelope.validator,
             status=status,
             timing={
@@ -80,7 +83,6 @@ def main() -> int:
             raw_outputs=raw_outputs,
         )
 
-        output_uri = get_output_uri(input_envelope)
         logger.info("Uploading FMU output envelope to %s", output_uri)
         upload_envelope(output_envelope, output_uri)
 
@@ -112,8 +114,10 @@ def main() -> int:
         try:
             if "input_envelope" in locals():
                 finished_at = datetime.now(UTC)
+                output_uri = get_output_uri(input_envelope)
                 failure_envelope = FMUOutputEnvelope(
                     run_id=input_envelope.run_id,
+                    **output_identity_for(input_envelope, output_uri),
                     validator=input_envelope.validator,
                     status=ValidationStatus.FAILED_RUNTIME,
                     timing={
@@ -128,7 +132,6 @@ def main() -> int:
                     ],
                     outputs=None,
                 )
-                output_uri = get_output_uri(input_envelope)
                 upload_envelope(failure_envelope, output_uri)
                 post_callback(
                     callback_url=(

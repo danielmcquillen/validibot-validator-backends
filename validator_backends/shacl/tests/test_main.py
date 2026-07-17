@@ -39,6 +39,9 @@ def _input_envelope(tmp_path):
         inputs=SHACLInputs(shapes_text="", rdf_format="turtle"),
         callback_url="https://example.com/callback",
         execution_bundle_uri=f"file://{tmp_path / 'bundle'}",
+        execution_attempt_id="attempt-1",
+        step_run_id="step-run-1",
+        expected_output_uri="file:///tmp/output.json",
         skip_callback=True,
     )
 
@@ -80,6 +83,8 @@ def test_main_uploads_shacl_report_as_output_artifact(monkeypatch, tmp_path):
     assert exit_code == 0
     output = captured["envelope"]
     assert output.artifacts
+    assert output.execution_attempt_id == "attempt-1"
+    assert len(output.input_envelope_sha256) == 64
     artifact = output.artifacts[0]
     assert artifact.name == "shacl-report.ttl"
     assert artifact.type == "shacl-report"

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-07-17
+
+### Changed (BREAKING)
+
+- Upgrade every validator image to the required `validibot-shared==0.15.0`
+  strict execution-attempt envelope contract.
+- Bind every success and failure output to the input envelope's step run,
+  execution attempt, contract version, canonical SHA-256, and exact output URI.
+- Reject `VALIDIBOT_OUTPUT_URI` overrides that conflict with the output URI
+  committed to by the input envelope.
+
+### Added
+
+- Add one shared output-identity helper used by EnergyPlus, FMU, SHACL, and
+  Schematron so their success and failure paths cannot drift.
+- Pin the cross-repository canonical input fixture digest in backend tests.
+
 ## [0.9.4] - 2026-07-15
 
 ### Changed

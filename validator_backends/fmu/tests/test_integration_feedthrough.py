@@ -22,6 +22,7 @@ import pytest
 from validator_backends.fmu import runner
 from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUInputs, FMUOutputs
 from validibot_shared.validations.envelopes import (
+    ATTEMPT_CONTRACT_VERSION,
     ExecutionContext,
     InputFileItem,
     SupportedMimeType,
@@ -75,6 +76,10 @@ def test_feedthrough_fmu_echoes_input_x86(monkeypatch, tmp_path) -> None:
         context=ExecutionContext(
             callback_url="http://example.com",
             execution_bundle_uri=str(tmp_path),
+            execution_attempt_id="attempt-1",
+            step_run_id="step-run-1",
+            attempt_contract_version=ATTEMPT_CONTRACT_VERSION,
+            expected_output_uri=f"file://{tmp_path / 'output.json'}",
         ),
     )
 
@@ -124,6 +129,10 @@ def test_feedthrough_fmu_echoes_input_arm64(monkeypatch, tmp_path) -> None:
         context=ExecutionContext(
             callback_url="http://example.com",
             execution_bundle_uri=str(tmp_path),
+            execution_attempt_id="attempt-1",
+            step_run_id="step-run-1",
+            attempt_contract_version=ATTEMPT_CONTRACT_VERSION,
+            expected_output_uri=f"file://{tmp_path / 'output.json'}",
         ),
     )
 

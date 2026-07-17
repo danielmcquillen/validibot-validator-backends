@@ -75,6 +75,9 @@ def _envelope(tmp_path: Path, *, submission: str, inputs: SHACLInputs):
         inputs=inputs,
         callback_url="https://example.com/cb",
         execution_bundle_uri=f"file://{tmp_path}",
+        execution_attempt_id="attempt-1",
+        step_run_id="step-run-1",
+        expected_output_uri=f"file://{tmp_path / 'output.json'}",
         skip_callback=True,
     )
 

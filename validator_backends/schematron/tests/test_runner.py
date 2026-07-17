@@ -65,6 +65,7 @@ def _envelope(
     schematron_text: str = SCH_TEXT,
     xslt_timeout_seconds: int = 60,
     execution_bundle_uri: str = "file:///tmp/run-1/",
+    expected_output_uri: str | None = None,
 ) -> SchematronInputEnvelope:
     """Build an input envelope over a file:// submission (no storage backend)."""
     return SchematronInputEnvelope(
@@ -88,6 +89,11 @@ def _envelope(
         context={
             "callback_url": "https://example.com/callback",
             "execution_bundle_uri": execution_bundle_uri,
+            "execution_attempt_id": "attempt-1",
+            "step_run_id": "step-run-1",
+            "attempt_contract_version": "validibot.attempt.v1",
+            "expected_output_uri": expected_output_uri
+            or f"{execution_bundle_uri.rstrip('/')}/output.json",
             "skip_callback": True,
         },
     )
@@ -265,6 +271,7 @@ def test_main_entrypoint_round_trips_the_envelope(tmp_path, monkeypatch):
     envelope = _envelope(
         FIXTURES / "invoice_invalid.xml",
         execution_bundle_uri=f"file://{bundle_dir}",
+        expected_output_uri=f"file://{tmp_path / 'output.json'}",
     )
     input_path = tmp_path / "input.json"
     input_path.write_text(envelope.model_dump_json(), encoding="utf-8")

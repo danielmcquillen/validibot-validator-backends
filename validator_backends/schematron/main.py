@@ -21,6 +21,7 @@ from validator_backends.core.callback_client import post_callback
 from validator_backends.core.envelope_loader import get_output_uri, load_input_envelope
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_envelope
+from validator_backends.core.output_identity import output_identity_for
 from validator_backends.core.report_artifacts import upload_text_report_artifact
 from validator_backends.schematron.runner import run_schematron_validation
 from validibot_shared.schematron.envelopes import (
@@ -58,8 +59,10 @@ def main() -> int:
         finished_at = datetime.now(UTC)
         artifacts = _upload_report_artifacts(input_envelope, result.svrl_text)
 
+        output_uri = get_output_uri(input_envelope)
         output_envelope = SchematronOutputEnvelope(
             run_id=input_envelope.run_id,
+            **output_identity_for(input_envelope, output_uri),
             validator=input_envelope.validator,
             status=result.status,
             timing={"started_at": started_at, "finished_at": finished_at},
@@ -69,7 +72,6 @@ def main() -> int:
             outputs=result.outputs,
         )
 
-        output_uri = get_output_uri(input_envelope)
         logger.info("Uploading Schematron output envelope to %s", output_uri)
         upload_envelope(output_envelope, output_uri)
 
@@ -100,8 +102,10 @@ def main() -> int:
         try:
             if "input_envelope" in locals():
                 finished_at = datetime.now(UTC)
+                output_uri = get_output_uri(input_envelope)
                 failure_envelope = SchematronOutputEnvelope(
                     run_id=input_envelope.run_id,
+                    **output_identity_for(input_envelope, output_uri),
                     validator=input_envelope.validator,
                     status=ValidationStatus.FAILED_RUNTIME,
                     timing={"started_at": started_at, "finished_at": finished_at},
@@ -113,7 +117,6 @@ def main() -> int:
                     ],
                     outputs=None,
                 )
-                output_uri = get_output_uri(input_envelope)
                 upload_envelope(failure_envelope, output_uri)
                 post_callback(
                     callback_url=(

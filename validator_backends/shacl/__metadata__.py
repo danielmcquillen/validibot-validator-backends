@@ -30,7 +30,10 @@ ENV_VARS = {
     },
     "VALIDIBOT_OUTPUT_URI": {
         "required": False,
-        "description": ("Storage URI for output envelope (optional, derived from input if unset)"),
+        "description": (
+            "Storage URI for output envelope; if set, it must exactly match "
+            "the input envelope contract"
+        ),
     },
     "VALIDIBOT_RUN_ID": {
         "required": False,

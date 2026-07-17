@@ -10,6 +10,7 @@ from __future__ import annotations
 from validator_backends.fmu import main as fmu_main
 from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUInputs, FMUOutputs
 from validibot_shared.validations.envelopes import (
+    ATTEMPT_CONTRACT_VERSION,
     ExecutionContext,
     InputFileItem,
     OrganizationInfo,
@@ -40,6 +41,10 @@ def _input_envelope() -> FMUInputEnvelope:
         inputs=FMUInputs(),
         context=ExecutionContext(
             execution_bundle_uri="gs://bucket/runs/run-1",
+            execution_attempt_id="attempt-1",
+            step_run_id="step-run-1",
+            attempt_contract_version=ATTEMPT_CONTRACT_VERSION,
+            expected_output_uri="gs://bucket/output.json",
             skip_callback=True,
         ),
     )
@@ -100,3 +105,5 @@ def test_main_includes_uploaded_artifacts_in_output_envelope(monkeypatch, tmp_pa
     output = captured["envelope"]
     assert output.artifacts == [uploaded_artifact]
     assert output.raw_outputs == raw_outputs
+    assert output.execution_attempt_id == "attempt-1"
+    assert len(output.input_envelope_sha256) == 64
