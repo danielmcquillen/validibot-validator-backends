@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-07-17
+
+### Changed (BREAKING)
+
+- Upgrade every validator image to `validibot-shared==0.17.0` and the
+  `validibot.attempt.v2` execution contract.
+- Echo the per-attempt callback nonce on every EnergyPlus, FMU, SHACL, and
+  Schematron success and failure callback path.
+
+### Security
+
+- Require both the callback ID and raw attempt nonce before issuing an HTTP
+  callback, while keeping the nonce out of logs and persisted result envelopes.
+- Pin every callback callsite with a cross-backend invariant test so a future
+  validator path cannot silently omit attempt authentication.
+
 ## [0.12.0] - 2026-07-17
 
 ### Changed

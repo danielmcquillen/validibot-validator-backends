@@ -34,6 +34,7 @@ from validibot_shared.schematron.envelopes import (
     SchematronOutputEnvelope,
 )
 from validibot_shared.validations.envelopes import (
+    ATTEMPT_CONTRACT_VERSION,
     InputFileItem,
     SupportedMimeType,
     ValidationStatus,
@@ -96,7 +97,7 @@ def _envelope(
             "execution_bundle_uri": execution_bundle_uri,
             "execution_attempt_id": "attempt-1",
             "step_run_id": "step-run-1",
-            "attempt_contract_version": "validibot.attempt.v1",
+            "attempt_contract_version": ATTEMPT_CONTRACT_VERSION,
             "expected_output_uri": expected_output_uri
             or f"{execution_bundle_uri.rstrip('/')}/output.json",
             "skip_callback": True,

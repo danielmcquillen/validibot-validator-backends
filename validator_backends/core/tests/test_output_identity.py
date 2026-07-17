@@ -11,7 +11,10 @@ import pytest
 
 from validator_backends.core.envelope_loader import get_output_uri
 from validator_backends.core.output_identity import output_identity_for
-from validibot_shared.canonicalization import sha256_hex_for_model
+from validibot_shared.canonicalization import (
+    compute_callback_nonce_commitment,
+    sha256_hex_for_model,
+)
 from validibot_shared.validations.envelopes import (
     ATTEMPT_CONTRACT_VERSION,
     SupportedMimeType,
@@ -69,6 +72,7 @@ def test_output_identity_rejects_a_different_output_uri():
 
 def test_shared_attempt_fixture_digest_matches_the_django_contract():
     """Backend canonicalization must match the literal pinned in every repo."""
+    callback_nonce = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
     envelope = ValidationInputEnvelope(
         run_id="run-fixture",
         validator={"id": "validator-fixture", "type": ValidatorType.FMU, "version": "1"},
@@ -97,10 +101,15 @@ def test_shared_attempt_fixture_digest_matches_the_django_contract():
             "attempt_contract_version": ATTEMPT_CONTRACT_VERSION,
             "expected_output_uri": "gs://fixture/runs/run-fixture/output.json",
             "execution_bundle_uri": "gs://fixture/runs/run-fixture/",
-            "skip_callback": True,
+            "callback_url": "https://example.com/callback",
+            "callback_id": "execution-attempt-attempt-fixture",
+            "callback_nonce": callback_nonce,
+            "callback_nonce_commitment": compute_callback_nonce_commitment(
+                callback_nonce,
+            ),
         },
     )
 
     assert sha256_hex_for_model(envelope) == (
-        "e17c5dae05c58f4d6034806e3f5e7a7602013d03f27ec811a97a9fc49f9d88d5"
+        "a212b9aaad3aca508a88608d70fd75b5642a8c0e20876308887789dc5bbfb64d"
     )

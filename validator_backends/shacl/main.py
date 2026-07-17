@@ -81,6 +81,7 @@ def main() -> int:
             status=result.status,
             result_uri=output_uri,
             callback_id=input_envelope.context.callback_id,
+            callback_nonce=input_envelope.context.callback_nonce,
             skip_callback=input_envelope.context.skip_callback,
         )
         logger.info("SHACL validation complete (status=%s)", result.status.value)
@@ -124,6 +125,7 @@ def main() -> int:
                     status=ValidationStatus.FAILED_RUNTIME,
                     result_uri=output_uri,
                     callback_id=input_envelope.context.callback_id,
+                    callback_nonce=input_envelope.context.callback_nonce,
                     skip_callback=input_envelope.context.skip_callback,
                 )
         except Exception:

@@ -4,7 +4,9 @@ HTTP callback client for validator containers.
 Provides utilities for POSTing validation completion callbacks back to
 the Django worker service. Authentication is delegated to a pluggable
 :mod:`validator_backends.core.callback_auth` backend so the transport code
-stays deployment-target agnostic.
+stays deployment-target agnostic. Every active callback also echoes the raw
+per-attempt nonce from the input envelope so Django can bind the notification
+to the exact execution attempt that received the secret.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ def post_callback(
     result_uri: str,
     *,
     callback_id: str | None = None,
+    callback_nonce: str | None = None,
     skip_callback: bool = False,
     timeout_seconds: int = 30,
     max_attempts: int = 3,
@@ -45,6 +48,8 @@ def post_callback(
         result_uri: GCS URI to output.json
         callback_id: Idempotency key echoed from the input envelope
             (for duplicate detection)
+        callback_nonce: Per-attempt secret echoed from the input envelope.
+            It is transported only in the callback payload and is never logged.
         skip_callback: If True, skip the callback POST (useful for testing)
         timeout_seconds: HTTP request timeout
         max_attempts: Retry attempts for transient failures
@@ -71,6 +76,13 @@ def post_callback(
         )
         return None
 
+    if not callback_id:
+        msg = "callback_id is required when sending a callback"
+        raise ValueError(msg)
+    if not callback_nonce:
+        msg = "callback_nonce is required when sending a callback"
+        raise ValueError(msg)
+
     logger.info(
         "POSTing callback for run_id=%s to %s (callback_id=%s)",
         run_id,
@@ -81,6 +93,7 @@ def post_callback(
     callback = ValidationCallback(
         run_id=run_id,
         callback_id=callback_id,
+        callback_nonce=callback_nonce,
         status=status,
         result_uri=result_uri,
     )

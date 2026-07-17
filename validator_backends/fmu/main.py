@@ -97,6 +97,7 @@ def main() -> int:
             status=status,
             result_uri=output_uri,
             callback_id=input_envelope.context.callback_id,
+            callback_nonce=input_envelope.context.callback_nonce,
             skip_callback=input_envelope.context.skip_callback,
         )
         logger.info("FMU validation complete (status=%s)", status.value)
@@ -144,6 +145,7 @@ def main() -> int:
                     status=ValidationStatus.FAILED_RUNTIME,
                     result_uri=output_uri,
                     callback_id=input_envelope.context.callback_id,
+                    callback_nonce=input_envelope.context.callback_nonce,
                     skip_callback=input_envelope.context.skip_callback,
                 )
         except Exception:

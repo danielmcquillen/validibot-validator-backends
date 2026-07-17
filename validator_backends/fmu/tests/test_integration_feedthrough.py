@@ -83,6 +83,7 @@ def test_feedthrough_fmu_echoes_input_x86(tmp_path) -> None:
             step_run_id="step-run-1",
             attempt_contract_version=ATTEMPT_CONTRACT_VERSION,
             expected_output_uri=f"file://{tmp_path / 'output.json'}",
+            skip_callback=True,
         ),
     )
 
@@ -127,6 +128,7 @@ def test_feedthrough_fmu_echoes_input_arm64(tmp_path) -> None:
             step_run_id="step-run-1",
             attempt_contract_version=ATTEMPT_CONTRACT_VERSION,
             expected_output_uri=f"file://{tmp_path / 'output.json'}",
+            skip_callback=True,
         ),
     )
 

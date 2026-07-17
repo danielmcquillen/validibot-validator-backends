@@ -411,6 +411,13 @@ The factory (`get_callback_auth()`) reads `DEPLOYMENT_TARGET` at
 startup and caches the backend for the container's lifetime, so the
 google-auth transport's connection pool is reused across callbacks.
 
+Transport authentication identifies the calling runtime. Independently, the
+`validibot.attempt.v2` envelope binds each notification to one execution
+attempt: Django places a fresh `callback_nonce` and its public commitment in
+the input context, and the validator returns the raw nonce with `callback_id`
+in the callback payload. The nonce is never logged or written to the result
+envelope, and canonical input hashing replaces it with its commitment.
+
 ### Storage URIs
 
 Validator backends support two storage backends:

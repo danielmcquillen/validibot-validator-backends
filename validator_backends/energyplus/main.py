@@ -151,6 +151,7 @@ def main() -> int:
             status=status,
             result_uri=output_uri,
             callback_id=input_envelope.context.callback_id,
+            callback_nonce=input_envelope.context.callback_nonce,
             skip_callback=input_envelope.context.skip_callback,
         )
 
@@ -339,6 +340,7 @@ def _handle_failure(
         status=ValidationStatus.FAILED_RUNTIME,
         result_uri=output_uri,
         callback_id=input_envelope.context.callback_id,
+        callback_nonce=input_envelope.context.callback_nonce,
         skip_callback=input_envelope.context.skip_callback,
     )
 

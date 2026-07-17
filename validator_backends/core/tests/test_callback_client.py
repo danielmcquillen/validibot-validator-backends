@@ -1,20 +1,26 @@
-"""Tests for callback client retry behaviour and callback_id handling.
+"""Tests for callback transport, retries, and attempt authentication.
 
 These tests focus on the HTTP transport layer — retry-on-transient,
-idempotency key propagation, and the skip paths. Authentication is
-stubbed out with a trivial :class:`_StubAuth` backend so the tests
-don't depend on google-auth or the real metadata server. Dedicated
-coverage for the auth backends lives in
+callback credential propagation, and the skip paths. The attempt nonce proves
+that the sender received the exact input envelope; the callback ID remains the
+idempotency key. Transport authentication is stubbed out with a trivial
+:class:`_StubAuth` backend so the tests don't depend on google-auth or the real
+metadata server. Dedicated coverage for the auth backends lives in
 ``test_callback_auth.py``.
 """
 
 from __future__ import annotations
 
 import httpx
+import pytest
 
 from validator_backends.core import callback_client
 from validator_backends.core.callback_auth import CallbackAuth
 from validibot_shared.validations.envelopes import ValidationStatus
+
+
+CALLBACK_ID = "execution-attempt-test"
+CALLBACK_NONCE = "A" * 43
 
 
 class _StubAuth(CallbackAuth):
@@ -87,6 +93,8 @@ def test_post_callback_retries_and_succeeds(monkeypatch):
         run_id="1",
         status=ValidationStatus.SUCCESS,
         result_uri="gs://bucket/run/output.json",
+        callback_id=CALLBACK_ID,
+        callback_nonce=CALLBACK_NONCE,
         max_attempts=2,
         retry_delay_seconds=0,
         auth=_StubAuth(),
@@ -133,6 +141,8 @@ def test_post_callback_rebuilds_auth_headers_per_attempt(monkeypatch):
         run_id="r",
         status=ValidationStatus.SUCCESS,
         result_uri="gs://x/y",
+        callback_id=CALLBACK_ID,
+        callback_nonce=CALLBACK_NONCE,
         max_attempts=3,
         retry_delay_seconds=0,
         auth=stub,
@@ -142,12 +152,13 @@ def test_post_callback_rebuilds_auth_headers_per_attempt(monkeypatch):
     assert len(stub.calls) == 3
 
 
-def test_post_callback_includes_callback_id_in_payload(monkeypatch):
-    """post_callback should include callback_id in the POST payload.
+def test_post_callback_includes_attempt_credentials_in_payload(monkeypatch):
+    """The POST payload must echo both attempt callback credentials.
 
     Django's ValidationCallbackService uses callback_id as the
     idempotency key to detect duplicate Cloud Tasks deliveries. Losing
-    it in transit means duplicate work and duplicate billed usage.
+    it in transit means duplicate work and duplicate billed usage. The raw
+    nonce separately proves the sender received this exact attempt envelope.
     """
     captured_payload = {}
 
@@ -167,59 +178,51 @@ def test_post_callback_includes_callback_id_in_payload(monkeypatch):
 
     monkeypatch.setattr(callback_client.httpx, "Client", _Client)
 
-    callback_id = "test-idempotency-key-12345"
     callback_client.post_callback(
         callback_url="http://example.com/callback",
         run_id="run-123",
         status=ValidationStatus.SUCCESS,
         result_uri="gs://bucket/run/output.json",
-        callback_id=callback_id,
+        callback_id=CALLBACK_ID,
+        callback_nonce=CALLBACK_NONCE,
         auth=_StubAuth(),
     )
 
-    assert captured_payload["callback_id"] == callback_id
+    assert captured_payload["callback_id"] == CALLBACK_ID
+    assert captured_payload["callback_nonce"] == CALLBACK_NONCE
     assert captured_payload["run_id"] == "run-123"
     assert captured_payload["status"] == "success"
     assert captured_payload["result_uri"] == "gs://bucket/run/output.json"
 
 
-def test_post_callback_without_callback_id(monkeypatch):
-    """post_callback should work without callback_id.
+@pytest.mark.parametrize(
+    ("callback_id", "callback_nonce", "expected_error"),
+    [
+        (None, CALLBACK_NONCE, "callback_id is required"),
+        (CALLBACK_ID, None, "callback_nonce is required"),
+    ],
+)
+def test_post_callback_rejects_missing_attempt_credentials(
+    callback_id,
+    callback_nonce,
+    expected_error,
+):
+    """An active callback must never fall back to unauthenticated attempt data.
 
-    Older validator envelopes may not carry an idempotency key.
-    Dropping the request would regress compatibility; sending null
-    tells Django to fall back to best-effort de-duplication.
+    Transport credentials identify the runtime, but they do not bind the
+    notification to one dispatched attempt. Both envelope-derived fields are
+    therefore mandatory before any HTTP request is created.
     """
-    captured_payload = {}
-
-    class _Client:
-        def __init__(self, timeout=None):
-            self.timeout = timeout
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            return False
-
-        def post(self, url, json=None, **kwargs):
-            captured_payload.update(json or {})
-            return _FakeResponse(200, json_body={"ok": True})
-
-    monkeypatch.setattr(callback_client.httpx, "Client", _Client)
-
-    callback_client.post_callback(
-        callback_url="http://example.com/callback",
-        run_id="run-456",
-        status=ValidationStatus.FAILED_VALIDATION,
-        result_uri="gs://bucket/run/output.json",
-        # callback_id not provided
-        auth=_StubAuth(),
-    )
-
-    assert captured_payload["callback_id"] is None
-    assert captured_payload["run_id"] == "run-456"
-    assert captured_payload["status"] == "failed_validation"
+    with pytest.raises(ValueError, match=expected_error):
+        callback_client.post_callback(
+            callback_url="http://example.com/callback",
+            run_id="run-456",
+            status=ValidationStatus.FAILED_VALIDATION,
+            result_uri="gs://bucket/run/output.json",
+            callback_id=callback_id,
+            callback_nonce=callback_nonce,
+            auth=_StubAuth(),
+        )
 
 
 def test_post_callback_sends_auth_header_from_backend(monkeypatch):
@@ -252,6 +255,8 @@ def test_post_callback_sends_auth_header_from_backend(monkeypatch):
         run_id="run-xyz",
         status=ValidationStatus.SUCCESS,
         result_uri="gs://bucket/run/output.json",
+        callback_id=CALLBACK_ID,
+        callback_nonce=CALLBACK_NONCE,
         auth=_StubAuth(token="deadbeef"),
     )
 
