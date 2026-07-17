@@ -10,10 +10,10 @@ All functions are re-exported from storage_client.py.
 
 from __future__ import annotations
 
-# Re-export all functions from storage_client for backwards compatibility
+# Keep the historical import path while enforcing the strict storage API.
 from validator_backends.core.storage_client import (
     download_envelope,
-    download_file,
+    download_verified_file,
     parse_gcs_uri,
     upload_directory,
     upload_envelope,
@@ -23,7 +23,7 @@ from validator_backends.core.storage_client import (
 
 __all__ = [
     "download_envelope",
-    "download_file",
+    "download_verified_file",
     "parse_gcs_uri",
     "upload_directory",
     "upload_envelope",

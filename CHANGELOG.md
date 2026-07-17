@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-07-17
+
+### Changed (BREAKING)
+
+- Upgrade every validator image to `validibot-shared==0.16.0` and require
+  exact size, SHA-256, and immutable storage version on every input, resource,
+  and produced artifact.
+- Route EnergyPlus, FMU, SHACL, and Schematron file materialization through one
+  bounded streaming verifier before any parser, native binary, or model code
+  sees the bytes.
+- Pin GCS reads to the envelope's exact object generation and use the declared
+  SHA-256 as the immutable version identity for read-only local attempt files.
+- Upload helpers now return exact output size, digest, and storage version so
+  output envelopes satisfy the same file-identity contract.
+
+### Security
+
+- Reject missing/stale GCS generations, provider size mismatches, over- and
+  under-sized streams, digest mismatches, and local-version mismatches.
+- Materialize into a sibling temporary file and atomically rename only after
+  verification, preserving any previously committed destination on failure.
+
 ## [0.10.0] - 2026-07-17
 
 ### Changed (BREAKING)

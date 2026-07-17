@@ -68,6 +68,8 @@ def _envelope(
     expected_output_uri: str | None = None,
 ) -> SchematronInputEnvelope:
     """Build an input envelope over a file:// submission (no storage backend)."""
+    submission_bytes = submission_path.read_bytes()
+    submission_sha256 = hashlib.sha256(submission_bytes).hexdigest()
     return SchematronInputEnvelope(
         run_id="run-1",
         validator={"id": "v1", "type": ValidatorType.SCHEMATRON, "version": "1"},
@@ -79,6 +81,9 @@ def _envelope(
                 mime_type=SupportedMimeType.APPLICATION_XML,
                 role="primary-model",
                 uri=f"file://{submission_path}",
+                size_bytes=len(submission_bytes),
+                sha256=submission_sha256,
+                storage_version=f"sha256:{submission_sha256}",
             ),
         ],
         inputs=SchematronInputs(

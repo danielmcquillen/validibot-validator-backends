@@ -14,6 +14,7 @@ Result-handling behaviour is the subtle part and is pinned explicitly:
 
 from __future__ import annotations
 
+import hashlib
 from typing import TYPE_CHECKING
 
 from validator_backends.shacl.runner import run_shacl_validation
@@ -63,6 +64,8 @@ def _envelope(tmp_path: Path, *, submission: str, inputs: SHACLInputs):
     """Write ``submission`` to a temp file and build a file:// input envelope."""
     sub = tmp_path / "submission.ttl"
     sub.write_text(submission, encoding="utf-8")
+    payload = sub.read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()
     return build_shacl_input_envelope(
         run_id="run-1",
         validator=_Validator(),
@@ -72,6 +75,9 @@ def _envelope(tmp_path: Path, *, submission: str, inputs: SHACLInputs):
         step_id="step-1",
         step_name="SHACL",
         submission_uri=f"file://{sub}",
+        submission_size_bytes=len(payload),
+        submission_sha256=digest,
+        submission_storage_version=f"sha256:{digest}",
         inputs=inputs,
         callback_url="https://example.com/cb",
         execution_bundle_uri=f"file://{tmp_path}",

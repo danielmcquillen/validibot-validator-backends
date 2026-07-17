@@ -199,13 +199,17 @@ def _upload_outputs(
         name = item.get("name", "")
         uri = item.get("uri", "")
         size_bytes = item.get("size_bytes")
+        sha256 = item.get("sha256", "")
+        storage_version = item.get("storage_version", "")
         artifacts.append(
             ValidationArtifact(
-                name=name,
+                name=Path(name).name,
                 type=_infer_artifact_type(name),
                 mime_type=_guess_mime_type(name),
                 uri=uri,
                 size_bytes=size_bytes,
+                sha256=sha256,
+                storage_version=storage_version,
             )
         )
 

@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from validator_backends.core.gcs_client import download_file
+from validator_backends.core.gcs_client import download_verified_file
 from validibot_shared.energyplus.envelopes import EnergyPlusOutputs
 from validibot_shared.energyplus.models import (
     STDOUT_TAIL_CHARS,
@@ -354,7 +354,7 @@ def _download_input_files(
         logger.info("Downloading input file: %s (role=%s)", file_item.name, file_item.role)
 
         destination = work_dir / file_item.name
-        download_file(file_item.uri, destination)
+        download_verified_file(file_item, destination)
 
         # Track primary model file
         if file_item.role == "primary-model":
@@ -372,12 +372,10 @@ def _download_input_files(
             resource.type,
         )
 
-        # Determine filename from URI
-        uri_path = resource.uri.split("/")[-1]
-        destination = work_dir / uri_path
+        destination = work_dir / resource.name
 
         try:
-            download_file(resource.uri, destination)
+            download_verified_file(resource, destination)
         except ValueError as exc:
             if resource.type == "energyplus_weather":
                 raise ValueError(

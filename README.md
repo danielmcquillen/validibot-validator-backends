@@ -74,6 +74,16 @@ After running validation, the backend writes an output envelope with:
 - **Metrics** — Numeric results (e.g., EUI for building models)
 - **Artifacts** — Generated files (reports, logs, etc.)
 
+Every file-bearing envelope item carries a safe logical filename, exact byte
+size, lowercase SHA-256, and provider-specific immutable storage version. The
+backend opens the exact GCS generation (or content-addressed local file),
+streams at most the declared size plus a one-byte overflow sentinel while
+hashing, and atomically exposes the local file only after the complete contract
+matches. Missing, interrupted, stale, short, long, or digest-mismatched inputs
+fail as execution-contract errors before domain parsers or binaries see them.
+Produced artifacts carry the same size, digest, and storage-version identity in
+the output envelope.
+
 ### File Ports
 
 The envelope fields `input_files` and `resource_files` are the wire format.

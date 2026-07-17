@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from validator_backends.core.callback_client import post_callback
 from validator_backends.core.envelope_loader import get_output_uri, load_input_envelope
@@ -29,9 +29,6 @@ from validibot_shared.validations.envelopes import (
 
 from .runner import run_fmu_simulation
 
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
@@ -184,13 +181,17 @@ def _upload_outputs(
         name = item.get("name", "")
         uri = item.get("uri", "")
         size_bytes = item.get("size_bytes")
+        sha256 = item.get("sha256", "")
+        storage_version = item.get("storage_version", "")
         artifacts.append(
             ValidationArtifact(
-                name=name,
+                name=Path(name).name,
                 type="file",
                 mime_type=_guess_mime_type(name),
                 uri=uri,
                 size_bytes=size_bytes,
+                sha256=sha256,
+                storage_version=storage_version,
             )
         )
 

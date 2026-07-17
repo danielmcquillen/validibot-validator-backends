@@ -33,7 +33,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
-from validator_backends.core.storage_client import download_file
+from validator_backends.core.storage_client import download_verified_file
 from validator_backends.shacl import engine
 from validibot_shared.shacl.envelopes import (
     SHACL_RESULT_FAIL_IMMEDIATELY,
@@ -231,10 +231,10 @@ def _download_submission(input_envelope: SHACLInputEnvelope) -> str:
     """Download the RDF submission file and return its text content."""
     if not input_envelope.input_files:
         raise ValueError("SHACL input envelope has no input_files")
-    uri = input_envelope.input_files[0].uri
+    file_item = input_envelope.input_files[0]
     with tempfile.TemporaryDirectory() as tmp:
         dest = Path(tmp) / "submission.rdf"
-        download_file(uri, dest)
+        download_verified_file(file_item, dest)
         return dest.read_text(encoding="utf-8")
 
 

@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
-from validator_backends.core.storage_client import download_file
+from validator_backends.core.storage_client import download_verified_file
 from validator_backends.schematron import engine
 from validibot_shared.schematron.envelopes import (
     ENGINE_STATUS_ERROR,
@@ -91,7 +91,7 @@ def run_schematron_validation(
         svrl_path = tmpdir / "report.svrl"
 
         try:
-            download_file(input_envelope.input_files[0].uri, submission_path)
+            download_verified_file(input_envelope.input_files[0], submission_path)
             sch_path.write_text(inputs.schematron_text, encoding="utf-8")
 
             # Both inputs are untrusted, and NOTHING must parse them before the

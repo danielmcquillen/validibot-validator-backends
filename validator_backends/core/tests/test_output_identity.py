@@ -14,6 +14,7 @@ from validator_backends.core.output_identity import output_identity_for
 from validibot_shared.canonicalization import sha256_hex_for_model
 from validibot_shared.validations.envelopes import (
     ATTEMPT_CONTRACT_VERSION,
+    SupportedMimeType,
     ValidationInputEnvelope,
     ValidatorType,
 )
@@ -77,6 +78,18 @@ def test_shared_attempt_fixture_digest_matches_the_django_contract():
             "step_id": "step-fixture",
             "step_name": "Fixture Step",
         },
+        input_files=[
+            {
+                "name": "model.fmu",
+                "mime_type": SupportedMimeType.FMU,
+                "role": "fmu",
+                "port_key": "fmu_model",
+                "uri": "gs://fixture/runs/run-fixture/model.fmu",
+                "size_bytes": 12,
+                "sha256": "1" * 64,
+                "storage_version": "1700000000000000",
+            },
+        ],
         inputs={"alpha": 1},
         context={
             "execution_attempt_id": "attempt-fixture",
@@ -89,5 +102,5 @@ def test_shared_attempt_fixture_digest_matches_the_django_contract():
     )
 
     assert sha256_hex_for_model(envelope) == (
-        "0f4f7cd8b38a79dbc2c4ac66c1ed602cb4db59665d52b6df73cd409bdaf765c7"
+        "e17c5dae05c58f4d6034806e3f5e7a7602013d03f27ec811a97a9fc49f9d88d5"
     )

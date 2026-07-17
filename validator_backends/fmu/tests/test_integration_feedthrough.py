@@ -1,10 +1,9 @@
 """
 Integration-style FMU test using the Feedthrough.fmu fixture.
 
-This exercises the runner against a real FMU (no network, local file copy). It
-monkeypatches download_file to copy the fixture into the working directory,
-builds a typed FMUInputEnvelope, and asserts the output echoes the input for
-the known feedthrough variable.
+This exercises the runner against a real FMU (no network) through the same
+streaming integrity verifier used in production, then asserts the output echoes
+the input for the known feedthrough variable.
 
 Two FMU fixtures are available:
 - Feedthrough.fmu: FMI 2.0, x86_64 only (darwin64)
@@ -13,8 +12,8 @@ Two FMU fixtures are available:
 
 from __future__ import annotations
 
+import hashlib
 import platform
-import shutil
 from pathlib import Path
 
 import pytest
@@ -37,8 +36,23 @@ def _is_apple_silicon() -> bool:
     )
 
 
+def _verified_local_item(fixture: Path) -> InputFileItem:
+    """Describe a fixture using the strict local immutable-file contract."""
+    payload = fixture.read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()
+    return InputFileItem(
+        name="model.fmu",
+        mime_type=SupportedMimeType.FMU,
+        role="fmu",
+        uri=f"file://{fixture}",
+        size_bytes=len(payload),
+        sha256=digest,
+        storage_version=f"sha256:{digest}",
+    )
+
+
 @pytest.mark.integration
-def test_feedthrough_fmu_echoes_input_x86(monkeypatch, tmp_path) -> None:
+def test_feedthrough_fmu_echoes_input_x86(tmp_path) -> None:
     """Run FMI 2.0 Feedthrough.fmu (x86_64) and assert Int32_output matches Int32_input."""
     if _is_apple_silicon():
         pytest.skip("Feedthrough.fmu (FMI 2.0) is x86_64-only; skip on Apple Silicon.")
@@ -51,24 +65,12 @@ def test_feedthrough_fmu_echoes_input_x86(monkeypatch, tmp_path) -> None:
     if not fixture.exists():
         pytest.skip("Feedthrough.fmu fixture not present (gitignored *.fmu).")
 
-    def _fake_download(uri: str, dest: Path) -> None:
-        shutil.copy(Path(uri), dest)
-
-    monkeypatch.setattr("validator_backends.fmu.runner.download_file", _fake_download)
-
     envelope = FMUInputEnvelope(
         run_id="test-run",
         validator={"id": "1", "type": "FMU", "version": "1"},
         org={"id": "1", "name": "Test Org"},
         workflow={"id": "1", "step_id": "1", "step_name": "Feedthrough"},
-        input_files=[
-            InputFileItem(
-                name="model.fmu",
-                mime_type=SupportedMimeType.FMU,
-                role="fmu",
-                uri=str(fixture),
-            )
-        ],
+        input_files=[_verified_local_item(fixture)],
         inputs=FMUInputs(
             input_values={"Int32_input": 5},
             output_variables=["Int32_output"],
@@ -89,7 +91,7 @@ def test_feedthrough_fmu_echoes_input_x86(monkeypatch, tmp_path) -> None:
 
 
 @pytest.mark.integration
-def test_feedthrough_fmu_echoes_input_arm64(monkeypatch, tmp_path) -> None:
+def test_feedthrough_fmu_echoes_input_arm64(tmp_path) -> None:
     """Run FMI 3.0 Feedthrough.fmu (ARM64) and assert Int32_output matches Int32_input.
 
     This test uses the Reference FMUs from https://github.com/modelica/Reference-FMUs
@@ -104,24 +106,12 @@ def test_feedthrough_fmu_echoes_input_arm64(monkeypatch, tmp_path) -> None:
     if not fixture.exists():
         pytest.skip("Feedthrough_fmi3_arm64.fmu fixture not present (gitignored *.fmu).")
 
-    def _fake_download(uri: str, dest: Path) -> None:
-        shutil.copy(Path(uri), dest)
-
-    monkeypatch.setattr("validator_backends.fmu.runner.download_file", _fake_download)
-
     envelope = FMUInputEnvelope(
         run_id="test-run",
         validator={"id": "1", "type": "FMU", "version": "1"},
         org={"id": "1", "name": "Test Org"},
         workflow={"id": "1", "step_id": "1", "step_name": "Feedthrough"},
-        input_files=[
-            InputFileItem(
-                name="model.fmu",
-                mime_type=SupportedMimeType.FMU,
-                role="fmu",
-                uri=str(fixture),
-            )
-        ],
+        input_files=[_verified_local_item(fixture)],
         inputs=FMUInputs(
             input_values={"Int32_input": 5},
             output_variables=["Int32_output"],

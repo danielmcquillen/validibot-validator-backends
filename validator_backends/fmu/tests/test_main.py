@@ -36,6 +36,9 @@ def _input_envelope() -> FMUInputEnvelope:
                 mime_type=SupportedMimeType.FMU,
                 role="fmu",
                 uri="gs://bucket/inputs/model.fmu",
+                size_bytes=42,
+                sha256="1" * 64,
+                storage_version="1700000000000000",
             ),
         ],
         inputs=FMUInputs(),
@@ -65,6 +68,8 @@ def test_main_includes_uploaded_artifacts_in_output_envelope(monkeypatch, tmp_pa
         mime_type="application/json",
         uri="gs://bucket/runs/run-1/outputs/result.json",
         size_bytes=42,
+        sha256="2" * 64,
+        storage_version="1700000000000001",
     )
     raw_outputs = fmu_main.RawOutputs(
         format="directory",

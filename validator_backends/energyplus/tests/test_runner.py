@@ -221,6 +221,8 @@ def test_rewrite_output_paths_prefers_gcs_uris() -> None:
             mime_type="application/x-sqlite3",
             uri="gs://bucket/run/outputs/eplusout.sql",
             size_bytes=123,
+            sha256="1" * 64,
+            storage_version="1700000000000000",
         ),
         ValidationArtifact(
             name="eplusout.err",
@@ -228,6 +230,8 @@ def test_rewrite_output_paths_prefers_gcs_uris() -> None:
             mime_type="text/plain",
             uri="gs://bucket/run/outputs/eplusout.err",
             size_bytes=42,
+            sha256="2" * 64,
+            storage_version="1700000000000001",
         ),
     ]
 

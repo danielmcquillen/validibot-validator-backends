@@ -33,13 +33,14 @@ def upload_text_report_artifact(
     with tempfile.TemporaryDirectory(prefix="validibot-report-") as tmp:
         report_path = Path(tmp) / filename
         report_path.write_text(content, encoding="utf-8")
-        upload_file(report_path, artifact_uri, content_type=mime_type)
-        size_bytes = report_path.stat().st_size
+        stored = upload_file(report_path, artifact_uri, content_type=mime_type)
 
     return ValidationArtifact(
         name=filename,
         type=artifact_type,
         mime_type=mime_type,
         uri=artifact_uri,
-        size_bytes=size_bytes,
+        size_bytes=stored.size_bytes,
+        sha256=stored.sha256,
+        storage_version=stored.storage_version,
     )

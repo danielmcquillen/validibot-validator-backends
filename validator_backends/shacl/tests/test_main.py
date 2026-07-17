@@ -7,6 +7,7 @@ generic artifact so Django can index it through artifact output ports.
 
 from __future__ import annotations
 
+import hashlib
 from types import SimpleNamespace
 
 from validator_backends.shacl import main as shacl_main
@@ -26,7 +27,9 @@ def _input_envelope(tmp_path):
     """Build a minimal SHACL input envelope with local output storage."""
 
     submission = tmp_path / "submission.ttl"
-    submission.write_text("@prefix ex: <http://example.org/> .", encoding="utf-8")
+    submission_payload = b"@prefix ex: <http://example.org/> ."
+    submission.write_bytes(submission_payload)
+    submission_sha256 = hashlib.sha256(submission_payload).hexdigest()
     return build_shacl_input_envelope(
         run_id="run-1",
         validator=_Validator(),
@@ -36,6 +39,9 @@ def _input_envelope(tmp_path):
         step_id="step-1",
         step_name="SHACL",
         submission_uri=f"file://{submission}",
+        submission_size_bytes=len(submission_payload),
+        submission_sha256=submission_sha256,
+        submission_storage_version=f"sha256:{submission_sha256}",
         inputs=SHACLInputs(shapes_text="", rdf_format="turtle"),
         callback_url="https://example.com/callback",
         execution_bundle_uri=f"file://{tmp_path / 'bundle'}",
@@ -90,6 +96,11 @@ def test_main_uploads_shacl_report_as_output_artifact(monkeypatch, tmp_path):
     assert artifact.type == "shacl-report"
     assert artifact.mime_type == "text/turtle"
     assert artifact.uri.endswith("/bundle/outputs/shacl-report.ttl")
+    report_payload = report_turtle.encode("utf-8")
+    report_sha256 = hashlib.sha256(report_payload).hexdigest()
+    assert artifact.size_bytes == len(report_payload)
+    assert artifact.sha256 == report_sha256
+    assert artifact.storage_version == f"sha256:{report_sha256}"
     assert (tmp_path / "bundle" / "outputs" / "shacl-report.ttl").read_text(
         encoding="utf-8",
     ) == report_turtle

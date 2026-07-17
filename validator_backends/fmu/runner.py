@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 from fmpy import read_model_description, simulate_fmu
 
-from validator_backends.core.gcs_client import download_file
+from validator_backends.core.gcs_client import download_verified_file
 from validibot_shared.fmu.envelopes import FMUOutputs
 
 
@@ -270,16 +270,16 @@ def run_fmu_simulation(input_envelope: FMUInputEnvelope) -> tuple[FMUOutputs, Pa
 
 def _download_fmu(input_envelope, work_dir: Path) -> Path:
     """Download the FMU referenced in the input envelope to the working directory."""
-    fmu_uri = None
+    fmu_item = None
     for file_item in input_envelope.input_files:
         if file_item.role == "fmu":
-            fmu_uri = file_item.uri
+            fmu_item = file_item
             break
-    if not fmu_uri:
+    if fmu_item is None:
         raise ValueError("No FMU URI found in input_files")
 
     target = work_dir / "model.fmu"
-    download_file(fmu_uri, target)
+    download_verified_file(fmu_item, target)
     return target
 
 
