@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `validibot.attempt.v2` execution contract.
 - Echo the per-attempt callback nonce on every EnergyPlus, FMU, SHACL, and
   Schematron success and failure callback path.
+- Refresh Google Cloud Storage, Google Auth, Sentry, Ruff, mypy, and SaxonC;
+  align production image requirements with the root dependency contract.
+- Update the pinned CodeQL SARIF upload action to v4.37.1.
 
 ### Security
 

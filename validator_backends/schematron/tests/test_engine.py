@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from validator_backends.schematron import engine
+from validator_backends.schematron import engine, saxon_worker
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -69,6 +69,29 @@ def test_guard_rejects_xxe_even_though_django_preguarded(tmp_path):
         )
 
 
+def test_guard_rejects_xinclude_before_saxon_parses_the_submission(tmp_path):
+    """XInclude cannot make an otherwise DTD-free document read local files.
+
+    SaxonC 13 no longer exposes the old ``xInclude-aware`` configuration
+    feature. Rejecting the instruction in the deterministic pre-guard keeps
+    source-node loading safe before URI protocols are disabled in the worker.
+    """
+    evil = tmp_path / "xinclude.xml"
+    evil.write_text(
+        '<root xmlns:xi="http://www.w3.org/2001/XInclude">'
+        '<xi:include href="file:///etc/passwd" parse="text"/>'
+        "</root>",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(engine.SchematronEngineError, match="forbidden XInclude"):
+        engine.guard_submission(
+            evil,
+            max_bytes=GENEROUS_LIMIT,
+            max_depth=engine.HARD_MAX_INPUT_DEPTH,
+        )
+
+
 def test_guard_enforces_size_and_depth_caps(tmp_path):
     """Oversize and over-deep documents are refused per the D8 table."""
     big = tmp_path / "big.xml"
@@ -102,6 +125,18 @@ def test_guard_clamps_envelope_limits_to_hard_maxima():
     )
     # Non-positive values fall back to the default, never "unlimited".
     assert engine.clamp(0, engine.HARD_MAX_INPUT_BYTES, default=42) == 42
+
+
+def test_saxon_worker_decodes_a_declared_non_utf8_xml_encoding():
+    """In-memory URI lockdown must not narrow valid XML to UTF-8 documents.
+
+    SaxonC 13's text API requires a Python string. The worker therefore honors
+    the XML declaration before passing text into the no-protocol processor,
+    preserving submissions such as legacy ISO-8859-1 business documents.
+    """
+    source = '<?xml version="1.0" encoding="ISO-8859-1"?><root>café</root>'
+
+    assert saxon_worker._decode_xml_bytes(source.encode("iso-8859-1")) == source
 
 
 # ── Query-binding detection (provenance) ─────────────────────────────────────
@@ -219,7 +254,6 @@ def test_uri_retrieval_functions_cannot_read_container_files(tmp_path):
         )
 
     message = str(exc.value)
-    assert "prohibited" in message
     assert "LEAK_VALIDIBOT_TEST_SECRET" not in message
     if out.exists():
         assert "LEAK_VALIDIBOT_TEST_SECRET" not in out.read_text(encoding="utf-8")

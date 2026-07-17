@@ -6,7 +6,7 @@ submission at dispatch, but this container trusts nothing it receives
 (defence in depth):
 
 - :func:`guard_submission` — the defusedxml posture (no DTD, no entities,
-  no external references) plus size/depth caps, re-applied here.
+  no external references or XInclude) plus size/depth caps, re-applied here.
 - :func:`run_schematron` — the SchXslt2 transpile of the author's ``.sch``
   plus the Saxon run, all inside a **subprocess** with a hard wall-clock
   timeout (native code cannot be interrupted in-process). A source that
@@ -53,6 +53,11 @@ _STDERR_TAIL_CHARS = 500
 # The ISO Schematron namespace an author's .sch root must declare (mirrors the
 # community authoring guard in validators/schematron/security.py).
 SCHEMATRON_NS = "http://purl.oclc.org/dsdl/schematron"
+XINCLUDE_NS = "http://www.w3.org/2001/XInclude"
+XINCLUDE_TAGS = {
+    f"{{{XINCLUDE_NS}}}include",
+    f"{{{XINCLUDE_NS}}}fallback",
+}
 
 
 class SchematronEngineError(Exception):
@@ -146,6 +151,9 @@ def guard_submission(
     stack = [(root, 1)]
     while stack:
         element, depth = stack.pop()
+        if element.tag in XINCLUDE_TAGS:
+            msg = "XML submission contains a forbidden XInclude instruction."
+            raise SchematronEngineError(msg)
         if depth > effective_max_depth:
             msg = f"XML submission nests deeper than the maximum ({effective_max_depth} levels)."
             raise SchematronEngineError(msg)
@@ -206,6 +214,9 @@ def guard_rules(
     stack = [(root, 1)]
     while stack:
         element, depth = stack.pop()
+        if element.tag in XINCLUDE_TAGS:
+            msg = "Schematron rules contain a forbidden XInclude instruction."
+            raise SchematronEngineError(msg, error_code="rules_invalid")
         if depth > effective_max_depth:
             msg = f"Schematron rules nest deeper than the maximum ({effective_max_depth} levels)."
             raise SchematronEngineError(msg, error_code="rules_invalid")

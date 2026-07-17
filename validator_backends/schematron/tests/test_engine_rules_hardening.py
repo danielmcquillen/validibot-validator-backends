@@ -281,6 +281,31 @@ def test_guard_rules_rejects_a_non_schematron_root(tmp_path):
     assert exc.value.error_code == "rules_invalid"
 
 
+def test_guard_rules_rejects_xinclude_before_saxon_parses_the_source(tmp_path):
+    """A DTD-free rules file cannot include arbitrary local XML through XInclude.
+
+    The Saxon worker briefly permits ``file`` only to parse its authorized
+    source paths into XDM nodes. This pre-guard ensures an embedded XInclude
+    cannot exploit that narrow loading phase before protocols are disabled.
+    """
+    sch = tmp_path / "xinclude.sch"
+    sch.write_text(
+        '<schema xmlns="http://purl.oclc.org/dsdl/schematron" '
+        'xmlns:xi="http://www.w3.org/2001/XInclude">'
+        '<xi:include href="file:///etc/passwd" parse="text"/>'
+        "</schema>",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(engine.SchematronEngineError, match="forbidden XInclude") as exc:
+        engine.guard_rules(
+            sch,
+            max_bytes=GENEROUS_LIMIT,
+            max_depth=engine.HARD_MAX_INPUT_DEPTH,
+        )
+    assert exc.value.error_code == "rules_invalid"
+
+
 def test_guard_rules_enforces_size_and_depth_caps(tmp_path):
     """Oversize / pathologically deep rules are refused as rules_invalid.
 
