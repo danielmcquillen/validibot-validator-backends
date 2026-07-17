@@ -17,6 +17,7 @@ from validator_backends.core.envelope_loader import get_output_uri, load_input_e
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_directory, upload_envelope
 from validator_backends.core.output_identity import output_identity_for
+from validator_backends.core.storage_client import StorageConflictError
 from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUOutputEnvelope
 from validibot_shared.validations.envelopes import (
     RawOutputs,
@@ -60,6 +61,9 @@ def main() -> int:
         try:
             execution_bundle_uri = str(input_envelope.context.execution_bundle_uri)
             artifacts, raw_outputs = _upload_outputs(work_dir, execution_bundle_uri)
+        except StorageConflictError:
+            logger.exception("FMU output identity already exists")
+            raise
         except Exception:
             logger.exception("Failed to upload FMU outputs; continuing without artifacts")
 

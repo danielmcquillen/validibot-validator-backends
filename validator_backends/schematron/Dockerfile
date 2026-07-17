@@ -20,7 +20,7 @@ FROM python:3.13-slim
 
 # Backend wrapper version — bump when wrapper code / image layout / output
 # semantics change. Decoupled from the Saxon pin in requirements.txt.
-ARG VALIDATOR_BACKEND_VERSION="0.1.0"
+ARG VALIDATOR_BACKEND_VERSION="0.12.0"
 ARG VALIDATOR_BACKEND_REVISION="unknown"
 ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="schematron"

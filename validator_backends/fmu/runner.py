@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from fmpy import read_model_description, simulate_fmu
 
 from validator_backends.core.gcs_client import download_verified_file
+from validator_backends.core.storage_client import create_attempt_work_dir
 from validibot_shared.fmu.envelopes import FMUOutputs
 
 
@@ -191,8 +192,10 @@ def run_fmu_simulation(input_envelope: FMUInputEnvelope) -> tuple[FMUOutputs, Pa
         raise ValueError("input_envelope.inputs.simulation is required")
 
     start_time = time.time()
-    work_dir = Path("/tmp/fmu_run") / input_envelope.run_id
-    work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir = create_attempt_work_dir(
+        Path("/tmp/fmu_run"),
+        str(input_envelope.context.execution_attempt_id),
+    )
 
     fmu_path = _download_fmu(input_envelope, work_dir)
     if not fmu_path.exists():

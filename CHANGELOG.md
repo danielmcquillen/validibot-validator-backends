@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-07-17
+
+### Changed
+
+- Publish local result envelopes, artifacts, and directory manifests through
+  atomic create-only materialization rather than replacement.
+- Publish every GCS output with `ifGenerationMatch=0` and translate an
+  existing-object precondition failure into a typed storage conflict.
+- Key EnergyPlus and FMU scratch directories by a safe hash of the execution
+  attempt ID and create them exclusively rather than reusing run-level state.
+- Treat output-identity conflicts as attempt failures even where an ordinary
+  artifact availability error may still produce a result without artifacts.
+
+### Security
+
+- Reject stale verified-input destinations before execution and reject all
+  same-byte output replays. Retries must use a new execution-attempt identity;
+  existing files or objects are never accepted as implicit idempotency proof.
+
 ## [0.11.0] - 2026-07-17
 
 ### Changed (BREAKING)

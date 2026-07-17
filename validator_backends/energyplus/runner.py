@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from validator_backends.core.gcs_client import download_verified_file
+from validator_backends.core.storage_client import create_attempt_work_dir
 from validibot_shared.energyplus.envelopes import EnergyPlusOutputs
 from validibot_shared.energyplus.models import (
     STDOUT_TAIL_CHARS,
@@ -259,9 +260,12 @@ def run_energyplus_simulation(
     """
     start_time = time.time()
 
-    # Create working directory
-    work_dir = Path("/tmp/energyplus_run") / input_envelope.run_id
-    work_dir.mkdir(parents=True, exist_ok=True)
+    # The envelope's attempt identity, rather than its parent run, owns scratch
+    # state. Exclusive creation makes stale in-container state a hard conflict.
+    work_dir = create_attempt_work_dir(
+        Path("/tmp/energyplus_run"),
+        str(input_envelope.context.execution_attempt_id),
+    )
 
     logger.info("Working directory: %s", work_dir)
 

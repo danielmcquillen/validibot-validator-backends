@@ -21,6 +21,7 @@ from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_envelope
 from validator_backends.core.output_identity import output_identity_for
 from validator_backends.core.report_artifacts import upload_text_report_artifact
+from validator_backends.core.storage_client import StorageConflictError
 from validator_backends.shacl.runner import run_shacl_validation
 from validibot_shared.shacl.envelopes import SHACLInputEnvelope, SHACLOutputEnvelope
 from validibot_shared.validations.envelopes import (
@@ -145,6 +146,9 @@ def _upload_report_artifacts(input_envelope: SHACLInputEnvelope, outputs):
             artifact_type="shacl-report",
             mime_type="text/turtle",
         )
+    except StorageConflictError:
+        logger.exception("SHACL report output identity already exists")
+        raise
     except Exception:
         logger.exception("Failed to upload SHACL report artifact; continuing without it")
         return []

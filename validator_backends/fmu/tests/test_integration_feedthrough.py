@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import platform
+import shutil
 from pathlib import Path
 
 import pytest
@@ -85,9 +86,12 @@ def test_feedthrough_fmu_echoes_input_x86(tmp_path) -> None:
         ),
     )
 
-    outputs, _ = runner.run_fmu_simulation(envelope)
-    assert isinstance(outputs, FMUOutputs)
-    assert outputs.output_values["Int32_output"] == pytest.approx(5)
+    outputs, work_dir = runner.run_fmu_simulation(envelope)
+    try:
+        assert isinstance(outputs, FMUOutputs)
+        assert outputs.output_values["Int32_output"] == pytest.approx(5)
+    finally:
+        shutil.rmtree(work_dir)
 
 
 @pytest.mark.integration
@@ -126,6 +130,9 @@ def test_feedthrough_fmu_echoes_input_arm64(tmp_path) -> None:
         ),
     )
 
-    outputs, _ = runner.run_fmu_simulation(envelope)
-    assert isinstance(outputs, FMUOutputs)
-    assert outputs.output_values["Int32_output"] == pytest.approx(5)
+    outputs, work_dir = runner.run_fmu_simulation(envelope)
+    try:
+        assert isinstance(outputs, FMUOutputs)
+        assert outputs.output_values["Int32_output"] == pytest.approx(5)
+    finally:
+        shutil.rmtree(work_dir)

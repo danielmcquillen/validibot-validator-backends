@@ -49,10 +49,15 @@ logger = logging.getLogger(__name__)
 
 STREAM_CHUNK_SIZE = 1024 * 1024
 LOCAL_STORAGE_VERSION_PREFIX = "sha256:"
+LOCAL_PUBLISHED_FILE_MODE = 0o644
 
 
 class FileVerificationError(ValueError):
     """Raised before execution when stored bytes violate their file contract."""
+
+
+class StorageConflictError(RuntimeError):
+    """Raised when a create-only input or output identity already exists."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +79,28 @@ class StoredFile:
     size_bytes: int
     sha256: str
     storage_version: str
+
+
+def create_attempt_work_dir(base_dir: Path, execution_attempt_id: str) -> Path:
+    """Create one safe, exclusive scratch directory for an execution attempt.
+
+    The attempt identifier comes from the input envelope, so it is hashed before
+    becoming a path component. Re-entering the same attempt in one runtime is a
+    conflict rather than permission to reuse stale verified inputs or outputs.
+    """
+    if not execution_attempt_id:
+        msg = "Execution attempt ID is required for backend scratch storage"
+        raise ValueError(msg)
+
+    base_dir.mkdir(parents=True, exist_ok=True)
+    safe_attempt_name = hashlib.sha256(execution_attempt_id.encode("utf-8")).hexdigest()
+    work_dir = base_dir / safe_attempt_name
+    try:
+        work_dir.mkdir()
+    except FileExistsError as exc:
+        msg = f"Create-only attempt scratch directory already exists: {work_dir}"
+        raise StorageConflictError(msg) from exc
+    return work_dir
 
 
 # =============================================================================
@@ -199,7 +226,8 @@ def upload_envelope(envelope: BaseModel, uri: str) -> None:
         uri: Storage URI where the envelope should be uploaded
 
     Raises:
-        ValueError: If URI is invalid
+        ValueError: If URI is invalid.
+        StorageConflictError: If the destination identity already exists.
     """
     logger.info("Uploading %s to %s", envelope.__class__.__name__, uri)
 
@@ -231,8 +259,9 @@ def download_verified_file(
 
     The expected size is a hard byte ceiling, not merely metadata checked after
     download. Bytes are written to a sibling temporary file, hashed during the
-    stream, and atomically renamed only after size, SHA-256, and storage version
-    all match. A failed verification leaves any existing destination untouched.
+    stream, and exposed through an atomic create-only commit only after size,
+    SHA-256, and storage version all match. An existing destination is a
+    contract conflict, including when it already contains the expected bytes.
 
     GCS reads pin ``item.storage_version`` as the blob generation. Local
     attempt files use ``sha256:<digest>`` as their immutable version policy and
@@ -241,6 +270,7 @@ def download_verified_file(
     uri = str(item.uri)
     logger.info("Streaming verified file from %s to %s", uri, destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    _reject_existing_local_destination(destination)
 
     fd, temporary_name = tempfile.mkstemp(
         dir=destination.parent,
@@ -274,7 +304,7 @@ def download_verified_file(
                 msg = f"Unsupported URI scheme: {scheme}"
                 raise FileVerificationError(msg)
 
-        temporary_path.replace(destination)
+        _commit_local_temp_create_only(temporary_path, destination)
     except Exception:
         temporary_path.unlink(missing_ok=True)
         raise
@@ -402,7 +432,8 @@ def upload_file(source: Path, uri: str, content_type: str | None = None) -> Stor
         content_type: Optional MIME type for the file (used for GCS only)
 
     Raises:
-        ValueError: If URI is invalid or source file doesn't exist
+        ValueError: If URI is invalid or source file doesn't exist.
+        StorageConflictError: If the destination identity already exists.
     """
     if not source.exists():
         raise ValueError(f"Source file does not exist: {source}")
@@ -518,18 +549,66 @@ def _read_local_file(path: str) -> str:
 
 
 def _write_local_file(path: str, content: str) -> None:
-    """Write text content to a local file."""
+    """Create one local text file without replacing an existing identity."""
     file_path = Path(path)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(content, encoding="utf-8")
+    with tempfile.TemporaryFile() as source:
+        source.write(content.encode("utf-8"))
+        source.seek(0)
+        _copy_stream_to_local_create_only(source, file_path)
 
 
 def _copy_local_file(source: Path, destination: Path) -> None:
-    """Copy a file from source to destination on local filesystem."""
+    """Create one local output file without replacing an existing identity."""
     if not source.exists():
         raise ValueError(f"Source file not found: {source}")
+    with source.open("rb") as source_file:
+        _copy_stream_to_local_create_only(source_file, destination)
+
+
+def _copy_stream_to_local_create_only(source: BinaryIO, destination: Path) -> None:
+    """Copy a stream to a temporary sibling, then publish it create-only."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    _reject_existing_local_destination(destination)
+
+    fd, temporary_name = tempfile.mkstemp(
+        dir=destination.parent,
+        prefix=f".{destination.name}.",
+        suffix=".part",
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "wb") as target:
+            shutil.copyfileobj(source, target, length=STREAM_CHUNK_SIZE)
+            os.fchmod(target.fileno(), LOCAL_PUBLISHED_FILE_MODE)
+        _commit_local_temp_create_only(temporary_path, destination)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+
+def _reject_existing_local_destination(destination: Path) -> None:
+    """Reject regular files, directories, symlinks, and broken symlinks."""
+    if os.path.lexists(destination):
+        msg = f"Create-only storage identity already exists: file://{destination}"
+        raise StorageConflictError(msg)
+
+
+def _commit_local_temp_create_only(
+    temporary_path: Path,
+    destination: Path,
+) -> None:
+    """Atomically expose a sibling temporary file without replacement.
+
+    The hard-link operation is atomic and fails when ``destination`` already
+    names any filesystem entry. Both paths share a parent directory, so they
+    are guaranteed to be on the same filesystem.
+    """
+    try:
+        os.link(temporary_path, destination)
+    except FileExistsError as exc:
+        msg = f"Create-only storage identity already exists: file://{destination}"
+        raise StorageConflictError(msg) from exc
+    temporary_path.unlink()
 
 
 def _file_identity(path: Path) -> tuple[int, str]:
@@ -569,24 +648,49 @@ def _download_gcs_text(uri: str) -> str:
 
 
 def _upload_gcs_text(uri: str, content: str) -> None:
-    """Upload text content to GCS."""
+    """Create one GCS text object without replacing an existing generation."""
     bucket_name, blob_path = parse_gcs_uri(uri)
     client = _get_gcs_client()
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(blob_path)
-    blob.upload_from_string(content, content_type="application/json")
+    try:
+        blob.upload_from_string(
+            content,
+            content_type="application/json",
+            if_generation_match=0,
+        )
+    except Exception as exc:
+        _raise_if_gcs_create_conflict(uri, exc)
+        raise
 
 
 def _upload_gcs_file(source: Path, uri: str, content_type: str | None = None) -> str:
-    """Upload a file to GCS and return its immutable generation."""
+    """Create a GCS file object and return its immutable generation."""
     bucket_name, blob_path = parse_gcs_uri(uri)
     client = _get_gcs_client()
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(blob_path)
-    blob.upload_from_filename(str(source), content_type=content_type)
+    try:
+        blob.upload_from_filename(
+            str(source),
+            content_type=content_type,
+            if_generation_match=0,
+        )
+    except Exception as exc:
+        _raise_if_gcs_create_conflict(uri, exc)
+        raise
     if blob.generation is None:
         blob.reload()
     if blob.generation is None:
         msg = f"GCS did not return an object generation after uploading {uri}"
         raise ValueError(msg)
     return str(blob.generation)
+
+
+def _raise_if_gcs_create_conflict(uri: str, exc: Exception) -> None:
+    """Translate GCS's generation-precondition failure into one typed error."""
+    from google.api_core.exceptions import PreconditionFailed
+
+    if isinstance(exc, PreconditionFailed):
+        msg = f"Create-only storage identity already exists: {uri}"
+        raise StorageConflictError(msg) from exc

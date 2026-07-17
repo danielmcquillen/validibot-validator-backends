@@ -21,6 +21,7 @@ from validator_backends.core.envelope_loader import get_output_uri, load_input_e
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_directory, upload_envelope
 from validator_backends.core.output_identity import output_identity_for
+from validator_backends.core.storage_client import StorageConflictError
 from validibot_shared.energyplus.envelopes import (
     EnergyPlusInputEnvelope,
     EnergyPlusOutputEnvelope,
@@ -85,6 +86,9 @@ def main() -> int:
             execution_bundle_uri = str(input_envelope.context.execution_bundle_uri)
             artifacts, raw_outputs = _upload_outputs(work_dir, execution_bundle_uri)
             outputs = _rewrite_output_paths(outputs, artifacts)
+        except StorageConflictError:
+            logger.exception("EnergyPlus output identity already exists")
+            raise
         except Exception:
             logger.exception("Failed to upload EnergyPlus outputs; continuing without artifacts")
 

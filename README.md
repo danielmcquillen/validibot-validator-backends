@@ -82,7 +82,11 @@ hashing, and atomically exposes the local file only after the complete contract
 matches. Missing, interrupted, stale, short, long, or digest-mismatched inputs
 fail as execution-contract errors before domain parsers or binaries see them.
 Produced artifacts carry the same size, digest, and storage-version identity in
-the output envelope.
+the output envelope. Verified local destinations and every published output
+envelope, artifact, and directory manifest are create-only: an existing path is
+a conflict even when it contains identical bytes. GCS writers enforce the same
+rule with `ifGenerationMatch=0`, so no backend success, failure, or retry can
+replace an object already committed to an attempt identity.
 
 ### File Ports
 
@@ -161,7 +165,7 @@ support, and release readability — not for cryptographic verification.
 
 ```dockerfile
 # validator_backends/energyplus/Dockerfile
-ARG VALIDATOR_BACKEND_VERSION="0.1.0"
+ARG VALIDATOR_BACKEND_VERSION="0.12.0"
 LABEL org.opencontainers.image.version="${VALIDATOR_BACKEND_VERSION}" ...
 ```
 
@@ -186,7 +190,7 @@ Concretely, a fresh `validator_backends/energyplus/Dockerfile` ships with:
 
 | Axis | Value | Bumped when |
 |---|---|---|
-| Wrapper version (`VALIDATOR_BACKEND_VERSION`) | `0.1.0` | Wrapper code, image layout, or output semantics change |
+| Wrapper version (`VALIDATOR_BACKEND_VERSION`) | `0.12.0` | Wrapper code, image layout, or output semantics change |
 | Bundled EnergyPlus binary | `25.2.0` | A newer EnergyPlus release is downloaded |
 
 These are independent:
@@ -206,7 +210,7 @@ library version. Bumping the bundled library does NOT imply bumping
 ```bash
 docker image inspect validibot-validator-backend-energyplus:latest \
   --format '{{ index .Config.Labels "org.opencontainers.image.version" }}'
-# → 0.1.0
+# → 0.12.0
 
 docker image inspect validibot-validator-backend-energyplus:latest \
   --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'

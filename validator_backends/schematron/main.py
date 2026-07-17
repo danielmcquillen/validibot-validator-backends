@@ -23,6 +23,7 @@ from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_envelope
 from validator_backends.core.output_identity import output_identity_for
 from validator_backends.core.report_artifacts import upload_text_report_artifact
+from validator_backends.core.storage_client import StorageConflictError
 from validator_backends.schematron.runner import run_schematron_validation
 from validibot_shared.schematron.envelopes import (
     SchematronInputEnvelope,
@@ -149,6 +150,9 @@ def _upload_report_artifacts(input_envelope: SchematronInputEnvelope, svrl_text:
             artifact_type="svrl-report",
             mime_type="application/xml",
         )
+    except StorageConflictError:
+        logger.exception("Schematron report output identity already exists")
+        raise
     except Exception:
         logger.exception(
             "Failed to upload Schematron SVRL artifact; continuing without it",

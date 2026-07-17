@@ -153,23 +153,22 @@ def test_local_file_is_atomically_committed_after_full_verification(tmp_path):
         ({"storage_version": "sha256:" + "f" * 64}, "must bind"),
     ],
 )
-def test_local_contract_mismatch_never_replaces_destination(
+def test_local_contract_mismatch_never_commits_destination(
     tmp_path,
     item_overrides,
     message,
 ):
-    """Size, digest, or version failure preserves the prior committed file."""
+    """Size, digest, or version failure leaves no executable final file."""
     payload = b"unexpected bytes"
     source = tmp_path / "source.bin"
     source.write_bytes(payload)
     destination = tmp_path / "input.bin"
-    destination.write_bytes(b"previously verified")
     item = _local_item(source, payload, **item_overrides)
 
     with pytest.raises(FileVerificationError, match=message):
         download_verified_file(item, destination)
 
-    assert destination.read_bytes() == b"previously verified"
+    assert not destination.exists()
     assert not list(tmp_path.glob(".*.part"))
 
 
@@ -251,8 +250,8 @@ def test_gcs_generation_mismatch_fails_before_open(monkeypatch, tmp_path):
     assert not (tmp_path / "input.bin").exists()
 
 
-def test_interrupted_gcs_stream_never_replaces_destination(monkeypatch, tmp_path):
-    """A partial provider response must leave no executable partial file."""
+def test_interrupted_gcs_stream_never_commits_destination(monkeypatch, tmp_path):
+    """A partial provider response must leave no executable final file."""
     payload = b"provider bytes"
     generation = 1_700_000_000_000_000
     blob = _FakeBlob(payload, generation, stream=_InterruptedStream(payload))
@@ -262,12 +261,11 @@ def test_interrupted_gcs_stream_never_replaces_destination(monkeypatch, tmp_path
         lambda: _FakeClient(_FakeBucket(blob)),
     )
     destination = tmp_path / "input.bin"
-    destination.write_bytes(b"previously verified")
 
     with pytest.raises(OSError, match="connection interrupted"):
         download_verified_file(_gcs_item(payload), destination)
 
-    assert destination.read_bytes() == b"previously verified"
+    assert not destination.exists()
     assert not list(tmp_path.glob(".*.part"))
 
 
