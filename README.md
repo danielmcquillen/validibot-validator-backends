@@ -88,6 +88,13 @@ a conflict even when it contains identical bytes. GCS writers enforce the same
 rule with `ifGenerationMatch=0`, so no backend success, failure, or retry can
 replace an object already committed to an attempt identity.
 
+On GCP, current Django launchers also inject a short-lived Credential Access
+Boundary token. The backend refuses any GCS URI outside that execution's
+attempt prefix and uses the envelope's callback nonce to renew an expired token
+only while Django still considers the attempt active. The Cloud Run service
+account itself should have no storage role, so compromised backend code cannot
+fall back to broader Application Default Credentials.
+
 ### File Ports
 
 The envelope fields `input_files` and `resource_files` are the wire format.
@@ -393,6 +400,12 @@ Validator backends receive configuration via environment variables:
 | `DEPLOYMENT_TARGET`              | No                | Selects the callback auth backend: `gcp`, `docker_compose`, `aws`, `local_docker_compose`, `test`. Set to `gcp` automatically by `just deploy`. |
 | `TASK_OIDC_AUDIENCE`             | GCP only          | Override the OIDC audience. If unset, derived from the callback URL's origin (scheme + host). Needed when the worker is fronted by a load balancer that signs with a different audience. |
 | `WORKER_API_KEY`                 | Docker / AWS only | Shared secret sent as `Authorization: Worker-Key …` on callbacks. Must match the Django-side `WORKER_API_KEY`.                                   |
+| `VALIDIBOT_GCS_CAPABILITY_REQUIRED` | Launcher-managed GCP | Makes missing or incomplete attempt credentials fail closed instead of using ambient ADC. |
+| `VALIDIBOT_GCS_ACCESS_TOKEN` | Launcher-managed GCP | Short-lived bearer token limited to one attempt prefix. Never log, persist, or configure this manually. |
+| `VALIDIBOT_GCS_ACCESS_TOKEN_EXPIRY` | Launcher-managed GCP | RFC 3339 expiry inherited from the source access token. |
+| `VALIDIBOT_GCS_ALLOWED_PREFIX` | Launcher-managed GCP | The only `gs://` prefix this execution may address. |
+| `VALIDIBOT_GCS_PROJECT_ID` | Launcher-managed GCP | Project used to construct the explicit GCS client. |
+| `VALIDIBOT_GCS_CAPABILITY_REFRESH_URL` | Launcher-managed GCP | Worker-only renewal endpoint; renewal requires the attempt callback nonce. |
 
 ### Callback Authentication
 

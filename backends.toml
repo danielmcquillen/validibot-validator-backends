@@ -7,7 +7,7 @@ requirements = "validator_backends/energyplus/requirements.txt"
 test_path = "validator_backends/energyplus/tests"
 version_source = "validator_backends/energyplus/__metadata__.py"
 image_name = "validibot-validator-backend-energyplus"
-shared_contract = "0.17.0"
+shared_contract = "0.18.0"
 platforms = ["linux/amd64"]
 release = true
 
@@ -18,7 +18,7 @@ requirements = "validator_backends/fmu/requirements.txt"
 test_path = "validator_backends/fmu/tests"
 version_source = "validator_backends/fmu/__metadata__.py"
 image_name = "validibot-validator-backend-fmu"
-shared_contract = "0.17.0"
+shared_contract = "0.18.0"
 platforms = ["linux/amd64"]
 release = true
 
@@ -29,7 +29,7 @@ requirements = "validator_backends/shacl/requirements.txt"
 test_path = "validator_backends/shacl/tests"
 version_source = "validator_backends/shacl/__metadata__.py"
 image_name = "validibot-validator-backend-shacl"
-shared_contract = "0.17.0"
+shared_contract = "0.18.0"
 platforms = ["linux/amd64"]
 release = true
 
@@ -40,6 +40,6 @@ requirements = "validator_backends/schematron/requirements.txt"
 test_path = "validator_backends/schematron/tests"
 version_source = "validator_backends/schematron/__metadata__.py"
 image_name = "validibot-validator-backend-schematron"
-shared_contract = "0.17.0"
+shared_contract = "0.18.0"
 platforms = ["linux/amd64"]
 release = true

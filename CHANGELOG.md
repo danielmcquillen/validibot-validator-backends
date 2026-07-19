@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-07-19
+
+### Added
+
+- Consume explicit Google Credential Access Boundary tokens for Cloud Run GCS
+  operations and reject any URI outside the injected execution-attempt prefix.
+- Renew expired tokens through the worker using the parsed input envelope's
+  attempt callback nonce, while keeping bearer values out of logs and reprs.
+
+### Security
+
+- Fail closed when Django marks an attempt capability as required but token
+  delivery is absent or incomplete; never fall back silently to ambient ADC.
+- Upgrade every backend image to `validibot-shared==0.18.0` so released images
+  include the current URI-free execution-evidence contract.
+
 ## [0.13.0] - 2026-07-17
 
 ### Changed (BREAKING)

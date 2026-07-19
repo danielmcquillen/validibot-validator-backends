@@ -25,6 +25,12 @@ from typing import BinaryIO, Protocol, TypedDict
 
 from pydantic import BaseModel
 
+from validator_backends.core.gcs_capability import (
+    assert_gcs_uri_allowed,
+    build_gcs_credentials,
+    configure_capability_refresh,
+)
+
 
 class _IntegrityBoundFile(Protocol):
     """Structural subset shared by input and resource file envelope items."""
@@ -205,6 +211,7 @@ def download_envelope[T: BaseModel](uri: str, envelope_class: type[T]) -> T:
         raise ValueError(f"Unsupported URI scheme: {scheme}")
 
     envelope = envelope_class.model_validate_json(json_content)
+    configure_capability_refresh(envelope)
 
     logger.info(
         "Successfully loaded %s envelope (run_id=%s)",
@@ -339,6 +346,7 @@ def _verify_local_storage_version(item: _IntegrityBoundFile) -> None:
 
 def _open_exact_gcs_generation(item: _IntegrityBoundFile):
     """Open the exact GCS generation named by an integrity-bound item."""
+    assert_gcs_uri_allowed(str(item.uri))
     try:
         generation = int(item.storage_version)
     except (TypeError, ValueError) as exc:
@@ -628,14 +636,18 @@ def _file_identity(path: Path) -> tuple[int, str]:
 
 
 def _get_gcs_client():
-    """Get or create a GCS client (lazy import to avoid requiring GCS in local mode)."""
+    """Build a GCS client with explicit attempt credentials when provided."""
     from google.cloud import storage
 
-    return storage.Client()
+    credentials, project_id = build_gcs_credentials()
+    if credentials is None:
+        return storage.Client()
+    return storage.Client(project=project_id, credentials=credentials)
 
 
 def _download_gcs_text(uri: str) -> str:
     """Download text content from GCS."""
+    assert_gcs_uri_allowed(uri)
     bucket_name, blob_path = parse_gcs_uri(uri)
     client = _get_gcs_client()
     bucket = client.bucket(bucket_name)
@@ -644,11 +656,12 @@ def _download_gcs_text(uri: str) -> str:
     if not blob.exists():
         raise ValueError(f"File not found at {uri}")
 
-    return blob.download_as_text()
+    return str(blob.download_as_text())
 
 
 def _upload_gcs_text(uri: str, content: str) -> None:
     """Create one GCS text object without replacing an existing generation."""
+    assert_gcs_uri_allowed(uri)
     bucket_name, blob_path = parse_gcs_uri(uri)
     client = _get_gcs_client()
     bucket = client.bucket(bucket_name)
@@ -666,6 +679,7 @@ def _upload_gcs_text(uri: str, content: str) -> None:
 
 def _upload_gcs_file(source: Path, uri: str, content_type: str | None = None) -> str:
     """Create a GCS file object and return its immutable generation."""
+    assert_gcs_uri_allowed(uri)
     bucket_name, blob_path = parse_gcs_uri(uri)
     client = _get_gcs_client()
     bucket = client.bucket(bucket_name)

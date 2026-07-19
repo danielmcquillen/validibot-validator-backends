@@ -2,7 +2,7 @@
 
 [project]
 name = "validibot-validator-backends"
-version = "0.13.0"
+version = "0.14.0"
 description = "Validibot advanced validator containers (EnergyPlus, FMU, SHACL, Schematron)"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -42,7 +42,7 @@ dependencies = [
     "google-auth==2.56.0",
     "requests==2.34.2",
     "sentry-sdk==2.66.0",
-    "validibot-shared==0.17.0",
+    "validibot-shared==0.18.0",
 ]
 
 [project.optional-dependencies]
