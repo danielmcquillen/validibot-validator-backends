@@ -97,7 +97,7 @@ Every released backend image supports the same two provider shapes:
 - **Service mode** (`VALIDIBOT_EXECUTION_SHAPE=service`): one shared HTTP parent
   listens on `/v1/execute`, validates the pinned Service revision/image/task and
   absolute deadline, then launches that same one-shot backend in a fresh child
-  process and attempt-specific scratch directory.
+  process, operating-system session, and attempt-specific scratch directory.
 
 Service concurrency is one. The long-lived parent never loads an input
 envelope or installs a bearer credential in module state; only the fresh child
@@ -106,6 +106,11 @@ with the worker before domain compute. Redelivery verifies an existing exact
 output and retries only the idempotent callback, or recomputes into the same
 create-only destination when no output exists. The Service response is
 transport evidence, not validation completion authority.
+
+On a hard deadline, the parent signals the child's complete process group with
+`SIGTERM`, waits for a bounded grace period, and escalates to `SIGKILL`. Native
+tools or CLI grandchildren therefore cannot outlive the request and consume
+resources on the next delivery to a warm Service instance.
 
 On GCP, current Django launchers also inject a short-lived Credential Access
 Boundary token. The backend refuses any GCS URI outside that execution's

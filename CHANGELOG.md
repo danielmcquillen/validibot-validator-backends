@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-07-21
+
+### Fixed
+
+- Start each Service request child in a dedicated operating-system session and
+  terminate its complete process group on the hard deadline, preventing native
+  validator grandchildren from surviving on a reused warm instance.
+
+### Changed
+
+- Upgrade every backend image to `validibot-shared==0.19.0` so the application
+  and runtime use the same additive execution-evidence contract.
+
 ## [0.15.0] - 2026-07-20
 
 ### Added

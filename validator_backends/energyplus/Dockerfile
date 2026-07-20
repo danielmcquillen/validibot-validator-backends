@@ -41,7 +41,7 @@ FROM python:3.13-slim
 #
 # Build-arg override is supported for release-engineering edge cases:
 #   docker build --build-arg VALIDATOR_BACKEND_VERSION=0.1.1-rc1 ...
-ARG VALIDATOR_BACKEND_VERSION="0.15.0"
+ARG VALIDATOR_BACKEND_VERSION="0.15.1"
 ARG VALIDATOR_BACKEND_REVISION="unknown"
 ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="energyplus"

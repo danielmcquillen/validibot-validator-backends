@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import json
+import signal
 import threading
 from datetime import UTC, datetime, timedelta
 from http.client import HTTPConnection
@@ -181,9 +182,10 @@ def test_each_delivery_gets_fresh_child_environment_and_removed_scratch(
             assert timeout == EXPECTED_CHILD_TIMEOUT_SECONDS
             return 0
 
-    def _popen(_command, *, env, stdout, stderr):
+    def _popen(_command, *, env, stdout, stderr, start_new_session):
         assert stdout == __import__("subprocess").PIPE
         assert stderr == __import__("subprocess").STDOUT
+        assert start_new_session is True
         observed_environments.append(env)
         observed_scratch_roots.append(Path(env["VALIDIBOT_ATTEMPT_SCRATCH_ROOT"]))
         return _Process()
@@ -207,30 +209,66 @@ def test_each_delivery_gets_fresh_child_environment_and_removed_scratch(
 
 
 def test_child_timeout_terminates_then_returns_retryable_failure(monkeypatch):
-    """The parent must kill work before the provider request deadline expires."""
+    """A deadline must signal the child's entire isolated process group."""
     _install_runtime_identity(monkeypatch)
+    received_signals = []
 
     class _Process:
-        terminated = False
+        pid = 4242
         stdout = io.BytesIO()
 
         def wait(self, timeout=None):
-            if not self.terminated:
+            if not received_signals:
                 raise __import__("subprocess").TimeoutExpired("child", timeout)
             return 0
 
-        def terminate(self):
-            self.terminated = True
-
-        def kill(self):
-            raise AssertionError("Graceful termination should have succeeded")
-
     monkeypatch.setattr("subprocess.Popen", lambda *_args, **_kwargs: _Process())
+    monkeypatch.setattr(
+        "os.killpg",
+        lambda process_group, sent_signal: received_signals.append(
+            (process_group, sent_signal)
+        ),
+    )
     request = ServiceExecutionRequest.model_validate(_payload())
 
     assert (
         execute_service_request(request, backend_module="example.backend") == TIMED_OUT_EXIT_CODE
     )
+    assert received_signals == [(4242, signal.SIGTERM)]
+
+
+def test_child_timeout_escalates_the_process_group_to_sigkill(monkeypatch):
+    """Native grandchildren that ignore SIGTERM must not survive the request."""
+    _install_runtime_identity(monkeypatch)
+    received_signals = []
+
+    class _Process:
+        pid = 4343
+        stdout = io.BytesIO()
+        waits = 0
+
+        def wait(self, timeout=None):
+            self.waits += 1
+            if self.waits < 3:
+                raise __import__("subprocess").TimeoutExpired("child", timeout)
+            return 0
+
+    monkeypatch.setattr("subprocess.Popen", lambda *_args, **_kwargs: _Process())
+    monkeypatch.setattr(
+        "os.killpg",
+        lambda process_group, sent_signal: received_signals.append(
+            (process_group, sent_signal)
+        ),
+    )
+    request = ServiceExecutionRequest.model_validate(_payload())
+
+    assert (
+        execute_service_request(request, backend_module="example.backend") == TIMED_OUT_EXIT_CODE
+    )
+    assert received_signals == [
+        (4343, signal.SIGTERM),
+        (4343, signal.SIGKILL),
+    ]
 
 
 def test_child_output_is_bounded_and_bearer_value_is_redacted(monkeypatch, caplog):

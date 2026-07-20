@@ -13,11 +13,13 @@ import json
 import logging
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+from contextlib import suppress
 from datetime import UTC, datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -155,6 +157,7 @@ def execute_service_request(
             env=_child_environment(request, scratch_root=scratch_root),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            start_new_session=True,
         )
         if process.stdout is None:  # pragma: no cover - Popen contract guard
             raise RuntimeError("Validator child stdout pipe was not created.")
@@ -168,11 +171,13 @@ def execute_service_request(
             return process.wait(timeout=child_timeout)
         except subprocess.TimeoutExpired:
             logger.warning("Validator child exceeded its hard execution deadline")
-            process.terminate()
+            with suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGTERM)
             try:
                 process.wait(timeout=CHILD_TERMINATION_GRACE_SECONDS)
             except subprocess.TimeoutExpired:
-                process.kill()
+                with suppress(ProcessLookupError):
+                    os.killpg(process.pid, signal.SIGKILL)
                 process.wait()
             return 124
         finally:
