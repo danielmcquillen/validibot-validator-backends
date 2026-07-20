@@ -12,7 +12,7 @@ FROM python:3.13-slim
 #
 # Build-arg override is supported for release-engineering edge cases:
 #   docker build --build-arg VALIDATOR_BACKEND_VERSION=0.1.1-rc1 ...
-ARG VALIDATOR_BACKEND_VERSION="0.14.0"
+ARG VALIDATOR_BACKEND_VERSION="0.15.0"
 ARG VALIDATOR_BACKEND_REVISION="unknown"
 ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="fmu"
@@ -52,4 +52,4 @@ COPY --chown=validibot:validibot validator_backends /app/validator_backends
 USER validibot
 
 # Run as a module so relative imports work correctly
-CMD ["python", "-m", "validator_backends.fmu.main"]
+CMD ["python", "-m", "validator_backends.core.entrypoint", "--backend-module", "validator_backends.fmu.main"]

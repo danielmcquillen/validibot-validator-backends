@@ -11,10 +11,10 @@ import re
 import sqlite3
 import subprocess
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from validator_backends.core.gcs_client import download_verified_file
+from validator_backends.core.scratch import attempt_scratch_base
 from validator_backends.core.storage_client import create_attempt_work_dir
 from validibot_shared.energyplus.envelopes import EnergyPlusOutputs
 from validibot_shared.energyplus.models import (
@@ -26,6 +26,8 @@ from validibot_shared.energyplus.models import (
 
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from validibot_shared.energyplus.envelopes import EnergyPlusInputEnvelope
 
 logger = logging.getLogger(__name__)
@@ -263,7 +265,7 @@ def run_energyplus_simulation(
     # The envelope's attempt identity, rather than its parent run, owns scratch
     # state. Exclusive creation makes stale in-container state a hard conflict.
     work_dir = create_attempt_work_dir(
-        Path("/tmp/energyplus_run"),
+        attempt_scratch_base("energyplus_run"),
         str(input_envelope.context.execution_attempt_id),
     )
 

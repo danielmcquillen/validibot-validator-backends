@@ -143,6 +143,17 @@ def configure_capability_refresh(envelope: BaseModel) -> None:
     )
 
 
+def refresh_attempt_capability() -> None:
+    """Re-authorize the attempt and replace its token before domain compute.
+
+    The worker's refresh endpoint verifies the callback nonce and rejects every
+    terminal attempt. Service children call this after parsing immutable input
+    but before invoking a domain tool, closing the race where a queued task was
+    delivered after cancellation while its original token was still valid.
+    """
+    _refresh_access_token(request=None)
+
+
 def _load_environment() -> tuple[GCSCapabilityConfig | None, _TokenState | None]:
     """Load and validate the immutable process capability environment once."""
     global _config

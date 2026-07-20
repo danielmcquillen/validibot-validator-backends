@@ -9,6 +9,10 @@ version_source = "validator_backends/energyplus/__metadata__.py"
 image_name = "validibot-validator-backend-energyplus"
 shared_contract = "0.18.0"
 platforms = ["linux/amd64"]
+execution_shapes = ["job", "service"]
+service_runtime_contract = "validibot-execution-v1"
+service_concurrency = 1
+service_max_domain_seconds = 1500
 release = true
 
 [[backend]]
@@ -20,6 +24,10 @@ version_source = "validator_backends/fmu/__metadata__.py"
 image_name = "validibot-validator-backend-fmu"
 shared_contract = "0.18.0"
 platforms = ["linux/amd64"]
+execution_shapes = ["job", "service"]
+service_runtime_contract = "validibot-execution-v1"
+service_concurrency = 1
+service_max_domain_seconds = 1500
 release = true
 
 [[backend]]
@@ -31,6 +39,10 @@ version_source = "validator_backends/shacl/__metadata__.py"
 image_name = "validibot-validator-backend-shacl"
 shared_contract = "0.18.0"
 platforms = ["linux/amd64"]
+execution_shapes = ["job", "service"]
+service_runtime_contract = "validibot-execution-v1"
+service_concurrency = 1
+service_max_domain_seconds = 1500
 release = true
 
 [[backend]]
@@ -42,4 +54,8 @@ version_source = "validator_backends/schematron/__metadata__.py"
 image_name = "validibot-validator-backend-schematron"
 shared_contract = "0.18.0"
 platforms = ["linux/amd64"]
+execution_shapes = ["job", "service"]
+service_runtime_contract = "validibot-execution-v1"
+service_concurrency = 1
+service_max_domain_seconds = 1500
 release = true

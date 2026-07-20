@@ -60,6 +60,10 @@ def test_manifest_schema_and_paths_are_valid():
             assert (REPO_ROOT / backend[key]).exists(), f"{slug}.{key} is missing"
         assert backend["image_name"] == f"validibot-validator-backend-{slug}"
         assert backend["platforms"] == ["linux/amd64"]
+        assert backend["execution_shapes"] == ["job", "service"]
+        assert backend["service_runtime_contract"] == "validibot-execution-v1"
+        assert backend["service_concurrency"] == 1
+        assert backend["service_max_domain_seconds"] == 1500
 
 
 def test_manifest_matches_release_and_developer_matrices():
@@ -78,6 +82,15 @@ def test_shared_contract_matches_backend_requirements():
         )
         expected_pin = f"validibot-shared=={backend['shared_contract']}"
         assert expected_pin in requirements
+
+
+def test_every_release_image_routes_job_and_service_through_shared_entrypoint():
+    """A backend cannot silently bypass the common isolation/HTTP contract."""
+    for backend in _backends():
+        dockerfile = (REPO_ROOT / backend["dockerfile"]).read_text(encoding="utf-8")
+        expected_module = f"validator_backends.{backend['slug']}.main"
+        assert "validator_backends.core.entrypoint" in dockerfile
+        assert f'"--backend-module", "{expected_module}"' in dockerfile
 
 
 def test_dockerignore_excludes_local_build_noise_and_secrets():

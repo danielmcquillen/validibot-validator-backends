@@ -29,6 +29,7 @@ from validator_backends.core.gcs_capability import (
     assert_gcs_uri_allowed,
     build_gcs_credentials,
     configure_capability_refresh,
+    refresh_attempt_capability,
 )
 
 
@@ -182,7 +183,12 @@ def parse_gcs_uri(uri: str) -> tuple[str, str]:
 # =============================================================================
 
 
-def download_envelope[T: BaseModel](uri: str, envelope_class: type[T]) -> T:
+def download_envelope[T: BaseModel](
+    uri: str,
+    envelope_class: type[T],
+    *,
+    configure_refresh: bool = True,
+) -> T:
     """
     Download and deserialize a Pydantic envelope from storage.
 
@@ -211,7 +217,10 @@ def download_envelope[T: BaseModel](uri: str, envelope_class: type[T]) -> T:
         raise ValueError(f"Unsupported URI scheme: {scheme}")
 
     envelope = envelope_class.model_validate_json(json_content)
-    configure_capability_refresh(envelope)
+    if configure_refresh:
+        configure_capability_refresh(envelope)
+        if os.getenv("VALIDIBOT_VERIFY_ATTEMPT_ACTIVE", "").lower() == "true":
+            refresh_attempt_capability()
 
     logger.info(
         "Successfully loaded %s envelope (run_id=%s)",
@@ -251,6 +260,19 @@ def upload_envelope(envelope: BaseModel, uri: str) -> None:
         raise ValueError(f"Unsupported URI scheme: {scheme}")
 
     logger.info("Successfully uploaded envelope to %s", uri)
+
+
+def stored_object_exists(uri: str) -> bool:
+    """Return whether the exact output identity already exists."""
+    scheme, path = parse_uri(uri)
+    if scheme == "file":
+        return Path(path).is_file()
+    if scheme == "gs":
+        assert_gcs_uri_allowed(uri)
+        bucket_name, blob_path = parse_gcs_uri(uri)
+        client = _get_gcs_client()
+        return bool(client.bucket(bucket_name).blob(blob_path).exists())
+    raise ValueError(f"Unsupported URI scheme: {scheme}")
 
 
 # =============================================================================

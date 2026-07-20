@@ -17,6 +17,7 @@ from validator_backends.core.envelope_loader import get_output_uri, load_input_e
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_directory, upload_envelope
 from validator_backends.core.output_identity import output_identity_for
+from validator_backends.core.replay import replay_existing_output
 from validator_backends.core.storage_client import StorageConflictError
 from validibot_shared.fmu.envelopes import FMUInputEnvelope, FMUOutputEnvelope
 from validibot_shared.validations.envelopes import (
@@ -45,6 +46,9 @@ def main() -> int:
 
     try:
         input_envelope = load_input_envelope(FMUInputEnvelope)
+        if replay_existing_output(input_envelope, FMUOutputEnvelope):
+            logger.info("Replayed existing FMU output without recompute")
+            return 0
         logger.info(
             "Loaded FMU input envelope for run_id=%s validator=%s",
             input_envelope.run_id,

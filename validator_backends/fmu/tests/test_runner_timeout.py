@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -63,7 +64,7 @@ def test_simulation_over_budget_is_terminated_and_reported_as_timeout(
     started = time.monotonic()
     with pytest.raises(runner.FMUSimulationTimeoutError):
         runner._run_simulation_with_timeout(
-            fmu_path=runner.Path("/tmp/does-not-matter.fmu"),
+            fmu_path=Path("/tmp/does-not-matter.fmu"),
             start_time=0.0,
             stop_time=1.0,
             step_size=None,
@@ -105,7 +106,7 @@ def test_fast_simulation_returns_result_within_budget(
     monkeypatch.setattr(runner, "simulate_fmu", _quick)
 
     result, log_messages = runner._run_simulation_with_timeout(
-        fmu_path=runner.Path("/tmp/does-not-matter.fmu"),
+        fmu_path=Path("/tmp/does-not-matter.fmu"),
         start_time=0.0,
         stop_time=1.0,
         step_size=None,

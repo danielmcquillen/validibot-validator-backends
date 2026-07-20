@@ -2,7 +2,7 @@
 # Validibot Validators Justfile
 # =============================================================================
 #
-# Build, test, and deploy validator containers for Cloud Run Jobs.
+# Build, test, and deploy validator containers for development Cloud Run Jobs.
 #
 # USAGE:
 #   just                        # List all available commands
@@ -187,25 +187,33 @@ build-push-all:
 # Cloud Run Jobs Deployment
 # =============================================================================
 
-# Deploy a validator as a Cloud Run Job to a specific stage
-# Usage: just deploy energyplus dev | just deploy fmu prod
-deploy validator stage: (build-push validator)
+# Deploy a validator as a development Cloud Run Job. Hosted production is
+# release-only and is owned by the validibot repository's GCP recipes.
+# Usage: just deploy energyplus dev
+deploy validator stage:
     #!/usr/bin/env bash
     set -euo pipefail
     if [[ ! "{{stage}}" =~ ^(dev|staging|prod)$ ]]; then
         echo "Error: stage must be 'dev', 'staging', or 'prod'"
         exit 1
     fi
+    if [ "{{stage}}" = "prod" ]; then
+        echo "Error: this repository does not deploy locally built images to production." >&2
+        echo "From the validibot repo, run:" >&2
+        echo "  VALIDATOR_BACKEND_RELEASE_TAG=vX.Y.Z just gcp validators-deploy-all prod" >&2
+        echo "  VALIDATOR_BACKEND_RELEASE_TAG=vX.Y.Z just gcp validator-services-deploy-all prod" >&2
+        exit 1
+    fi
+    just build-push {{validator}}
 
     # Compute stage-specific names.
     #
     # Two DISTINCT service accounts, matching the main repo's
     # `just validator-deploy` (validibot/just/gcp/mod.just):
     #   * RUNTIME_SA — the dedicated, least-privilege identity the validator
-    #     container RUNS AS (--service-account). It has GCS access on the run
-    #     bundle and run.invoker on the worker (for callbacks), but NOT
-    #     secrets / Cloud SQL / Cloud Tasks / KMS. A compromised validator is
-    #     thus contained.
+    #     container RUNS AS (--service-account). It can invoke the worker for
+    #     callbacks but has no ambient GCS, secrets, Cloud SQL, Cloud Tasks, or
+    #     KMS role. Attempt data comes from the short-lived GCS capability.
     #   * INVOKER_SA — the main web/worker identity allowed to TRIGGER the job
     #     (granted validibot_job_runner below). The Django worker runs as this
     #     SA when it calls the Jobs API to launch a validation.

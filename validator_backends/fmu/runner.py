@@ -11,17 +11,19 @@ from __future__ import annotations
 import logging
 import multiprocessing
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fmpy import read_model_description, simulate_fmu
 
 from validator_backends.core.gcs_client import download_verified_file
+from validator_backends.core.scratch import attempt_scratch_base
 from validator_backends.core.storage_client import create_attempt_work_dir
 from validibot_shared.fmu.envelopes import FMUOutputs
 
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from validibot_shared.fmu.envelopes import FMUInputEnvelope
 
 logger = logging.getLogger(__name__)
@@ -193,7 +195,7 @@ def run_fmu_simulation(input_envelope: FMUInputEnvelope) -> tuple[FMUOutputs, Pa
 
     start_time = time.time()
     work_dir = create_attempt_work_dir(
-        Path("/tmp/fmu_run"),
+        attempt_scratch_base("fmu_run"),
         str(input_envelope.context.execution_attempt_id),
     )
 

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-07-20
+
+### Added
+
+- Add one shared bounded HTTP Service runtime for EnergyPlus, FMU, SHACL, and
+  Schematron while preserving their existing one-shot Cloud Run Job mode.
+- Run every Service request in a fresh child process and scratch directory,
+  with concurrency one, immutable revision/image checks, hard deadlines, and
+  bounded secret-redacted child logs.
+- Re-authorize an attempt against the worker immediately before domain compute,
+  then replay verified immutable output without repeating domain work.
+- Declare the versioned Service runtime contract and supported execution shapes
+  in the authoritative backend inventory.
+
+### Security
+
+- Keep per-attempt GCS bearer credentials only in the request child environment
+  and remove its scratch/process state after every delivery.
+- Reject deployment, revision, image, task, prefix, expiry, and absolute-deadline
+  mismatches before starting validator compute.
+
 ## [0.14.0] - 2026-07-19
 
 ### Added

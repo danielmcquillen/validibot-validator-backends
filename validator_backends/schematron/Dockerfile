@@ -20,7 +20,7 @@ FROM python:3.13-slim
 
 # Backend wrapper version — bump when wrapper code / image layout / output
 # semantics change. Decoupled from the Saxon pin in requirements.txt.
-ARG VALIDATOR_BACKEND_VERSION="0.14.0"
+ARG VALIDATOR_BACKEND_VERSION="0.15.0"
 ARG VALIDATOR_BACKEND_REVISION="unknown"
 ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="schematron"
@@ -78,4 +78,4 @@ USER validibot
 
 # Run as a module so the Saxon worker subprocess
 # (python -m validator_backends.schematron.saxon_worker) resolves correctly.
-CMD ["python", "-m", "validator_backends.schematron.main"]
+CMD ["python", "-m", "validator_backends.core.entrypoint", "--backend-module", "validator_backends.schematron.main"]

@@ -42,7 +42,7 @@ The repository is named `validibot-validator-backends` to reflect that these are
 
 Unlike Validibot's built-in "simple" validators (JSON Schema, XML Schema, etc.) that run directly in the Django process, validator backends:
 
-- **Run in isolation** — Each advanced validation runs in its own container with resource limits
+- **Run in isolation** — Each advanced validation runs in a one-shot container or a fresh request child process with explicit resource limits
 - **Have complex dependencies** — [EnergyPlus™](https://energyplus.net/), FMPy, and other domain-specific tools
 - **Are secure by default** — Network isolation, memory limits, and automatic cleanup
 - **Scale independently** — Can run on separate infrastructure from the core platform
@@ -87,6 +87,25 @@ envelope, artifact, and directory manifest are create-only: an existing path is
 a conflict even when it contains identical bytes. GCS writers enforce the same
 rule with `ifGenerationMatch=0`, so no backend success, failure, or retry can
 replace an object already committed to an attempt identity.
+
+### Cloud execution shapes
+
+Every released backend image supports the same two provider shapes:
+
+- **Job mode** (default): the image starts its existing one-shot backend and
+  exits. This remains the Cloud Run Job and long-running compatibility path.
+- **Service mode** (`VALIDIBOT_EXECUTION_SHAPE=service`): one shared HTTP parent
+  listens on `/v1/execute`, validates the pinned Service revision/image/task and
+  absolute deadline, then launches that same one-shot backend in a fresh child
+  process and attempt-specific scratch directory.
+
+Service concurrency is one. The long-lived parent never loads an input
+envelope or installs a bearer credential in module state; only the fresh child
+receives the attempt-scoped GCS capability. The child re-authorizes the attempt
+with the worker before domain compute. Redelivery verifies an existing exact
+output and retries only the idempotent callback, or recomputes into the same
+create-only destination when no output exists. The Service response is
+transport evidence, not validation completion authority.
 
 On GCP, current Django launchers also inject a short-lived Credential Access
 Boundary token. The backend refuses any GCS URI outside that execution's
@@ -315,7 +334,10 @@ Django Worker → Docker API → Validator Backend Container → Local Storage
 
 ### Cloud Deployment (Container Registry)
 
-For cloud deployments, validator backends run as container jobs (e.g., Cloud Run Jobs, Kubernetes Jobs):
+For cloud deployments, validator backends can run as one-shot jobs or as a
+bounded HTTP Service that launches the same one-shot entrypoint in a fresh
+child. Hosted GCP uses release-specific Cloud Run Services as the primary route
+and retains Cloud Run Jobs for long-running work and rollback.
 
 ```bash
 # Set your GCP project (see "Container Registry Setup" below)
@@ -324,21 +346,29 @@ export VALIDIBOT_GCP_PROJECT="your-project-id"
 # Build and push to your container registry
 just build-push energyplus
 
-# Deploy to Cloud Run Jobs (GCP example)
-just deploy energyplus prod
+# Development Cloud Run Job only
+just deploy energyplus dev
 ```
 
 ```
-Cloud Run Service → Cloud Tasks → Cloud Run Job → GCS Storage
-        ↑                                              │
-        └───────────── Callback POST ──────────────────┘
+Application task → Validibot worker → deterministic provider task
+                                      ├─→ private Cloud Run Service (primary)
+                                      └─→ retained Cloud Run Job (long budget)
+                                                  │
+                                verified output + callback
 ```
 
 **Characteristics:**
 
-- Asynchronous execution (triggered via task queue)
+- Asynchronous execution with an immutable deployment selected before dispatch
 - Cloud storage (`gs://` URIs for GCP, `s3://` for AWS, etc.)
-- HTTP callback when complete
+- Attempt-scoped credentials and an authenticated HTTP callback when complete
+
+Production deployment is intentionally absent from this repository. Release
+the backend here, then use the `validibot` repository's
+`VALIDATOR_BACKEND_RELEASE_TAG=vX.Y.Z just gcp ...` recipes. Those recipes
+verify the signed tag, attestation, equal GHCR/GAR digest, provider revision,
+and IAM policy before registration or activation.
 
 ## Container Registry Setup
 

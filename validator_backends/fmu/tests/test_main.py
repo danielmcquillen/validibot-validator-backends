@@ -79,6 +79,11 @@ def test_main_includes_uploaded_artifacts_in_output_envelope(monkeypatch, tmp_pa
     monkeypatch.setattr(fmu_main, "load_input_envelope", lambda _model: _input_envelope())
     monkeypatch.setattr(
         fmu_main,
+        "replay_existing_output",
+        lambda _input, _output_type: False,
+    )
+    monkeypatch.setattr(
+        fmu_main,
         "run_fmu_simulation",
         lambda _envelope: (
             FMUOutputs(

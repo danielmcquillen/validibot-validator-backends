@@ -22,6 +22,7 @@ from validator_backends.core.envelope_loader import get_output_uri, load_input_e
 from validator_backends.core.error_reporting import report_fatal
 from validator_backends.core.gcs_client import upload_envelope
 from validator_backends.core.output_identity import output_identity_for
+from validator_backends.core.replay import replay_existing_output
 from validator_backends.core.report_artifacts import upload_text_report_artifact
 from validator_backends.core.storage_client import StorageConflictError
 from validator_backends.schematron.runner import run_schematron_validation
@@ -50,6 +51,9 @@ def main() -> int:
 
     try:
         input_envelope = load_input_envelope(SchematronInputEnvelope)
+        if replay_existing_output(input_envelope, SchematronOutputEnvelope):
+            logger.info("Replayed existing Schematron output without recompute")
+            return 0
         logger.info(
             "Loaded Schematron input envelope for run_id=%s rules_sha256=%s",
             input_envelope.run_id,
