@@ -29,6 +29,7 @@ BACKEND_OPTIONAL_GROUPS = {
     "fmu": ("fmpy",),
     "shacl": ("rdflib", "pyshacl", "owlrl", "defusedxml", "lxml"),
     "schematron": ("saxonche", "defusedxml"),
+    "portfolio_manager": ("defusedxml", "openpyxl", "xlrd"),
 }
 
 

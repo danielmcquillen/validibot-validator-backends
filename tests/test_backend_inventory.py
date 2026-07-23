@@ -58,7 +58,8 @@ def test_manifest_schema_and_paths_are_valid():
         assert (REPO_ROOT / "validator_backends" / slug).is_dir()
         for key in ("dockerfile", "requirements", "test_path", "version_source"):
             assert (REPO_ROOT / backend[key]).exists(), f"{slug}.{key} is missing"
-        assert backend["image_name"] == f"validibot-validator-backend-{slug}"
+        image_slug = slug.replace("_", "-")
+        assert backend["image_name"] == f"validibot-validator-backend-{image_slug}"
         assert backend["platforms"] == ["linux/amd64"]
         assert backend["execution_shapes"] == ["job", "service"]
         assert backend["service_runtime_contract"] == "validibot-execution-v1"

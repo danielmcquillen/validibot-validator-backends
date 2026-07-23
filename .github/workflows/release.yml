@@ -158,7 +158,7 @@ jobs:
       matrix:
         # Keep in sync with `validators` in the justfile — every validator
         # that ships as a container must be published to GHCR on release.
-        validator: [energyplus, fmu, shacl, schematron]
+        validator: [energyplus, fmu, shacl, schematron, portfolio_manager]
 
     permissions:
       # Required for OIDC token exchange (used by GHCR push, GCP
@@ -200,7 +200,8 @@ jobs:
         run: |
           # GHCR namespace requires lower-case owner; normalise.
           OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
-          GHCR_IMAGE="ghcr.io/${OWNER_LC}/validibot-validator-backend-${VALIDATOR}"
+          VALIDATOR_IMAGE_SLUG="${VALIDATOR//_/-}"
+          GHCR_IMAGE="ghcr.io/${OWNER_LC}/validibot-validator-backend-${VALIDATOR_IMAGE_SLUG}"
           {
             echo "ghcr_image=${GHCR_IMAGE}"
             echo "tag=${TAG_REF}"
@@ -277,7 +278,8 @@ jobs:
           TAG_REF: ${{ inputs.tag || github.ref_name }}
         run: |
           GAR_REGISTRY="${GCP_REGION}-docker.pkg.dev"
-          GAR_IMAGE="${GAR_REGISTRY}/${GCP_PROJECT_ID}/${GCP_GAR_REPOSITORY}/validibot-validator-backend-${VALIDATOR}"
+          VALIDATOR_IMAGE_SLUG="${VALIDATOR//_/-}"
+          GAR_IMAGE="${GAR_REGISTRY}/${GCP_PROJECT_ID}/${GCP_GAR_REPOSITORY}/validibot-validator-backend-${VALIDATOR_IMAGE_SLUG}"
           # ``crane`` copies the image manifest + layers verbatim,
           # preserving the digest. Re-pushing via ``docker push``
           # would rebuild and the digest would drift; crane is the

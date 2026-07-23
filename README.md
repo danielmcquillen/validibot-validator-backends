@@ -57,6 +57,7 @@ The core Validibot platform triggers these backends, passes input via the standa
 | **FMU** | Validates and executes Functional Mock-up Units | FMU structure validation, variable discovery, bounded simulation testing |
 | **SHACL** | Validates RDF graphs in an isolated container | RDF parsing, SHACL shapes, SHACL-AF/SPARQL isolation, semantic model checks |
 | **Schematron** | Validates XML documents against Schematron rules | Peppol/EN 16931-style business rules, SVRL findings, XSLT isolation |
+| **Portfolio Manager** | Validates ENERGY STAR Portfolio Manager property reports | XLS/XLSX/XML normalization, safe ZIP collections, EBL reconciliation, EUIt and Washington Form C facts |
 
 ## How It Works
 
@@ -133,6 +134,7 @@ Current backend ports:
 | FMU | `fmu_model 1..1` rendered as `input_files[role=fmu]` | Source may be a library FMU model or a step-owned workflow resource. |
 | SHACL | `data_graph 1..1` rendered as an RDF input file; shapes and ontology currently travel inline in typed `inputs` | Future large/reusable shapes or ontologies should become declared resource/artifact ports. |
 | Schematron | `xml_document 1..1` rendered as an XML input file; Schematron rules currently travel inline in typed `inputs` | Future generated or reusable `.sch` files should become declared resource/artifact ports. |
+| Portfolio Manager | `portfolio_manager_report 1..1` accepts one XLS/XLSX/XML report or ZIP collection; optional `expected_buildings_list 0..1` is a workflow resource | Emits the bounded scalar catalog plus the `portfolio-manager-property-results` JSON artifact. |
 
 Backend code should read files by role, and by future optional `port_key` when
 available. Do not add new backends that depend on `input_files[0]` without also

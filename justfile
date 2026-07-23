@@ -51,7 +51,7 @@ git_sha := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
 
 # Available validators (drives build-all / build-push-all / deploy-all and the
 # release CI matrix — a validator omitted here is silently skipped by those).
-validators := "energyplus fmu shacl schematron"
+validators := "energyplus fmu shacl schematron portfolio_manager"
 
 # =============================================================================
 # Default - List Commands
@@ -66,11 +66,11 @@ validators := "energyplus fmu shacl schematron"
 
 # Run all tests
 test *args:
-    uv run --extra dev --extra fmu --extra shacl --extra schematron pytest {{args}}
+    uv run --extra dev --extra fmu --extra shacl --extra schematron --extra portfolio_manager pytest {{args}}
 
 # Run tests for a specific validator
 test-validator validator:
-    uv run --extra dev --extra fmu --extra shacl --extra schematron pytest validator_backends/{{validator}}/tests
+    uv run --extra dev --extra fmu --extra shacl --extra schematron --extra portfolio_manager pytest validator_backends/{{validator}}/tests
 
 # Lint all code
 lint:
@@ -106,6 +106,8 @@ check: lint test
 build validator:
     #!/usr/bin/env bash
     set -euo pipefail
+    IMAGE_SLUG="{{validator}}"
+    IMAGE_SLUG="${IMAGE_SLUG//_/-}"
     build_platform="${VALIDATOR_BUILD_PLATFORM:-}"
     if [[ "{{validator}}" == "energyplus" && -z "$build_platform" ]]; then
         build_platform="linux/amd64"
@@ -124,10 +126,10 @@ build validator:
         ${VALIDATOR_BACKEND_VERSION:+--build-arg VALIDATOR_BACKEND_VERSION="${VALIDATOR_BACKEND_VERSION}"} \
         --build-arg VALIDATOR_BACKEND_REVISION="{{git_sha}}" \
         --build-arg VALIDATOR_BACKEND_SLUG="{{validator}}" \
-        -t validibot-validator-backend-{{validator}}:latest \
-        -t validibot-validator-backend-{{validator}}:{{git_sha}} \
+        -t validibot-validator-backend-${IMAGE_SLUG}:latest \
+        -t validibot-validator-backend-${IMAGE_SLUG}:{{git_sha}} \
         .
-    echo "✓ Built validibot-validator-backend-{{validator}}:{{git_sha}}"
+    echo "✓ Built validibot-validator-backend-${IMAGE_SLUG}:{{git_sha}}"
 
 # Build all validator containers
 build-all:
@@ -148,6 +150,8 @@ build-all:
 build-push validator:
     #!/usr/bin/env bash
     set -euo pipefail
+    IMAGE_SLUG="{{validator}}"
+    IMAGE_SLUG="${IMAGE_SLUG//_/-}"
     if [[ -z "{{gcp_project}}" ]]; then
         echo "Error: Container registry not configured."
         echo ""
@@ -170,10 +174,10 @@ build-push validator:
         ${VALIDATOR_BACKEND_VERSION:+--build-arg VALIDATOR_BACKEND_VERSION="${VALIDATOR_BACKEND_VERSION}"} \
         --build-arg VALIDATOR_BACKEND_REVISION="{{git_sha}}" \
         --build-arg VALIDATOR_BACKEND_SLUG="{{validator}}" \
-        -t {{ar_repo}}/validibot-validator-backend-{{validator}}:latest \
-        -t {{ar_repo}}/validibot-validator-backend-{{validator}}:{{git_sha}} \
+        -t {{ar_repo}}/validibot-validator-backend-${IMAGE_SLUG}:latest \
+        -t {{ar_repo}}/validibot-validator-backend-${IMAGE_SLUG}:{{git_sha}} \
         .
-    echo "✓ Built and pushed {{ar_repo}}/validibot-validator-backend-{{validator}}:{{git_sha}}"
+    echo "✓ Built and pushed {{ar_repo}}/validibot-validator-backend-${IMAGE_SLUG}:{{git_sha}}"
 
 # Build and push all validators
 build-push-all:
@@ -194,6 +198,8 @@ build-push-all:
 deploy validator stage:
     #!/usr/bin/env bash
     set -euo pipefail
+    IMAGE_SLUG="{{validator}}"
+    IMAGE_SLUG="${IMAGE_SLUG//_/-}"
     if [[ ! "{{stage}}" =~ ^(dev|staging|prod)$ ]]; then
         echo "Error: stage must be 'dev', 'staging', or 'prod'"
         exit 1
@@ -226,18 +232,18 @@ deploy validator stage:
     # least privilege. (Both SAs are created by `just gcp init-stage` in the
     # main repo; run that first.)
     if [ "{{stage}}" = "prod" ]; then
-        JOB_NAME="validibot-validator-backend-{{validator}}"
+        JOB_NAME="validibot-validator-backend-${IMAGE_SLUG}"
         RUNTIME_SA="validibot-validator-prod@{{gcp_project}}.iam.gserviceaccount.com"
         INVOKER_SA="validibot-cloudrun-prod@{{gcp_project}}.iam.gserviceaccount.com"
     else
-        JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
+        JOB_NAME="validibot-validator-backend-${IMAGE_SLUG}-{{stage}}"
         RUNTIME_SA="validibot-validator-{{stage}}@{{gcp_project}}.iam.gserviceaccount.com"
         INVOKER_SA="validibot-cloudrun-{{stage}}@{{gcp_project}}.iam.gserviceaccount.com"
     fi
 
     echo "Deploying $JOB_NAME to {{stage}}..."
     gcloud run jobs deploy "$JOB_NAME" \
-        --image {{ar_repo}}/validibot-validator-backend-{{validator}}:{{git_sha}} \
+        --image {{ar_repo}}/validibot-validator-backend-${IMAGE_SLUG}:{{git_sha}} \
         --region {{gcp_region}} \
         --project {{gcp_project}} \
         --service-account "$RUNTIME_SA" \
@@ -285,10 +291,12 @@ list-jobs:
 # Show job details
 describe-job validator stage="prod":
     #!/usr/bin/env bash
+    IMAGE_SLUG="{{validator}}"
+    IMAGE_SLUG="${IMAGE_SLUG//_/-}"
     if [ "{{stage}}" = "prod" ]; then
-        JOB_NAME="validibot-validator-backend-{{validator}}"
+        JOB_NAME="validibot-validator-backend-${IMAGE_SLUG}"
     else
-        JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
+        JOB_NAME="validibot-validator-backend-${IMAGE_SLUG}-{{stage}}"
     fi
     gcloud run jobs describe "$JOB_NAME" \
         --region {{gcp_region}} \
@@ -297,10 +305,12 @@ describe-job validator stage="prod":
 # View recent job logs
 logs validator stage="prod" lines="100":
     #!/usr/bin/env bash
+    IMAGE_SLUG="{{validator}}"
+    IMAGE_SLUG="${IMAGE_SLUG//_/-}"
     if [ "{{stage}}" = "prod" ]; then
-        JOB_NAME="validibot-validator-backend-{{validator}}"
+        JOB_NAME="validibot-validator-backend-${IMAGE_SLUG}"
     else
-        JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
+        JOB_NAME="validibot-validator-backend-${IMAGE_SLUG}-{{stage}}"
     fi
     gcloud logging read \
         "resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"$JOB_NAME\"" \
@@ -311,10 +321,12 @@ logs validator stage="prod" lines="100":
 # Delete a validator job
 delete-job validator stage="prod":
     #!/usr/bin/env bash
+    IMAGE_SLUG="{{validator}}"
+    IMAGE_SLUG="${IMAGE_SLUG//_/-}"
     if [ "{{stage}}" = "prod" ]; then
-        JOB_NAME="validibot-validator-backend-{{validator}}"
+        JOB_NAME="validibot-validator-backend-${IMAGE_SLUG}"
     else
-        JOB_NAME="validibot-validator-backend-{{validator}}-{{stage}}"
+        JOB_NAME="validibot-validator-backend-${IMAGE_SLUG}-{{stage}}"
     fi
     echo "Deleting Cloud Run Job $JOB_NAME..."
     gcloud run jobs delete "$JOB_NAME" \
@@ -329,17 +341,23 @@ delete-job validator stage="prod":
 
 # Run a validator container locally (for testing)
 run-local validator input_uri:
+    #!/usr/bin/env bash
+    IMAGE_SLUG="{{validator}}"
+    IMAGE_SLUG="${IMAGE_SLUG//_/-}"
     docker run --rm \
         -e VALIDIBOT_INPUT_URI={{input_uri}} \
         -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/adc.json \
         -v "$HOME/.config/gcloud/application_default_credentials.json:/tmp/keys/adc.json:ro" \
-        validibot-validator-backend-{{validator}}:latest
+        validibot-validator-backend-${IMAGE_SLUG}:latest
 
 # Shell into a validator container (for debugging)
 shell validator:
+    #!/usr/bin/env bash
+    IMAGE_SLUG="{{validator}}"
+    IMAGE_SLUG="${IMAGE_SLUG//_/-}"
     docker run --rm -it \
         --entrypoint /bin/bash \
-        validibot-validator-backend-{{validator}}:latest
+        validibot-validator-backend-${IMAGE_SLUG}:latest
 
 # =============================================================================
 # CI/CD Helpers

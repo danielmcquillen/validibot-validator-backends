@@ -19,7 +19,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ENTRYPOINTS = tuple(
     REPO_ROOT / "validator_backends" / slug / "main.py"
-    for slug in ("energyplus", "fmu", "shacl", "schematron")
+    for slug in ("energyplus", "fmu", "shacl", "schematron", "portfolio_manager")
 )
 EXPECTED_ATTEMPT_KEYWORDS = {
     "callback_id": "input_envelope.context.callback_id",

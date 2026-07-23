@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-07-23
+
+### Added
+
+- Add the isolated Portfolio Manager backend with both Cloud Run Service and
+  Job execution shapes.
+- Parse bounded XLSX, BIFF XLS, SpreadsheetML, legacy HTML-table XLS, and XML
+  report carriers into one typed property contract.
+- Validate safe mixed-carrier ZIP collections, versioned Expected Buildings
+  Lists, reporting periods, explicit Alert Metric policies, EUIt precedence,
+  parent/child overlap, and portfolio aggregates.
+- Publish a deterministic per-property and reconciliation artifact while
+  keeping unbounded property arrays out of CEL.
+
+### Changed
+
+- Upgrade every backend image to `validibot-shared==0.20.0`.
+
 ## [0.15.1] - 2026-07-21
 
 ### Fixed

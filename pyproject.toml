@@ -2,8 +2,8 @@
 
 [project]
 name = "validibot-validator-backends"
-version = "0.15.1"
-description = "Validibot advanced validator containers (EnergyPlus, FMU, SHACL, Schematron)"
+version = "0.16.0"
+description = "Validibot advanced validator containers"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
@@ -42,7 +42,7 @@ dependencies = [
     "google-auth==2.56.0",
     "requests==2.34.2",
     "sentry-sdk==2.66.0",
-    "validibot-shared==0.19.0",
+    "validibot-shared==0.20.0",
 ]
 
 [project.optional-dependencies]
@@ -80,6 +80,12 @@ schematron = [
     "defusedxml==0.7.1",
 ]
 
+portfolio_manager = [
+    "defusedxml==0.7.1",
+    "openpyxl==3.1.5",
+    "xlrd==2.0.2",
+]
+
 [project.urls]
 Homepage = "https://validibot.com"
 Documentation = "https://docs.validibot.com"
@@ -113,6 +119,7 @@ testpaths = [
     "validator_backends/fmu/tests",
     "validator_backends/shacl/tests",
     "validator_backends/schematron/tests",
+    "validator_backends/portfolio_manager/tests",
 ]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
