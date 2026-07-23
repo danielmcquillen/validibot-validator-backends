@@ -309,6 +309,17 @@ just test
 just test-validator energyplus
 ```
 
+Normal development and CI use the exact published `validibot-shared` wheel
+recorded in `uv.lock`, matching the package installed in every backend image.
+When coordinating an unreleased shared-contract change, opt into the sibling
+checkout for the specific test command instead of committing a path source:
+
+```bash
+uv run --with-editable ../validibot-shared \
+  --extra dev --extra fmu --extra shacl --extra schematron \
+  --extra portfolio_manager pytest
+```
+
 ## Deployment Modes
 
 Validator backends support two deployment modes:

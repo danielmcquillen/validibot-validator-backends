@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Resolve the root development and CI environment from the published
+  `validibot-shared` wheel recorded in `uv.lock`, matching the dependency
+  installed in every released backend image.
+- Keep sibling-checkout testing explicit and ephemeral rather than committing a
+  local path source that release-ready builds must override.
+- Run CI with the committed lockfile frozen.
+
 ## [0.16.0] - 2026-07-23
 
 ### Added

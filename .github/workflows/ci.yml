@@ -18,16 +18,6 @@ jobs:
       matrix:
         python-version: ["3.13"]
 
-    # Ignore [tool.uv.sources] for the whole job. That table points
-    # validibot-shared at the local ../validibot-shared editable checkout
-    # for dev convenience; it does not exist on the runner. Setting this
-    # once means every `uv`/`uvx` invocation (sync, run, uvx) resolves the
-    # published validibot-shared from the index — matching what the
-    # container images ship. (Per-command --no-sources is not enough:
-    # `uv run` re-resolves the environment each time.)
-    env:
-      UV_NO_SOURCES: "1"
-
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -42,8 +32,9 @@ jobs:
       - name: Install dependencies
         # --all-extras installs the per-validator groups (shacl, fmu, ...) that
         # pytest's testpaths collect; without them those modules fail to import.
-        # (Source-ignoring is handled by UV_NO_SOURCES at the job level.)
-        run: uv sync --all-extras
+        # --frozen guarantees CI tests the exact registry artifacts recorded in
+        # the committed lockfile, matching the released container requirements.
+        run: uv sync --all-extras --frozen
 
       - name: Audit dependencies
         run: uvx pip-audit
