@@ -16,12 +16,13 @@
 #     # Edit .env with your GCP project and region
 #
 # DEPLOYMENT:
-#   This justfile handles the full deployment lifecycle. You can also use
-#   the main validibot justfile (../validibot/justfile) which has equivalent
-#   commands. Both work - use whichever is more convenient:
+#   This justfile builds and deploys development Cloud Run Jobs. The main
+#   validibot repository owns complete signed-release deployment to both Jobs
+#   and Services:
 #
 #     From validibot-validator-backends/:  just deploy energyplus dev
-#     From validibot/:      just validator-deploy energyplus dev
+#     From validibot/: just gcp validator-job-deploy energyplus dev
+#     Production:      just gcp validator-deploy-all prod vX.Y.Z
 #
 # =============================================================================
 
@@ -200,8 +201,7 @@ deploy validator stage:
     if [ "{{stage}}" = "prod" ]; then
         echo "Error: this repository does not deploy locally built images to production." >&2
         echo "From the validibot repo, run:" >&2
-        echo "  VALIDATOR_BACKEND_RELEASE_TAG=vX.Y.Z just gcp validators-deploy-all prod" >&2
-        echo "  VALIDATOR_BACKEND_RELEASE_TAG=vX.Y.Z just gcp validator-services-deploy-all prod" >&2
+        echo "  just gcp validator-deploy-all prod vX.Y.Z" >&2
         exit 1
     fi
     just build-push {{validator}}
@@ -209,7 +209,7 @@ deploy validator stage:
     # Compute stage-specific names.
     #
     # Two DISTINCT service accounts, matching the main repo's
-    # `just validator-deploy` (validibot/just/gcp/mod.just):
+    # `just gcp validator-job-deploy` (validibot/just/gcp/mod.just):
     #   * RUNTIME_SA — the dedicated, least-privilege identity the validator
     #     container RUNS AS (--service-account). It can invoke the worker for
     #     callbacks but has no ambient GCS, secrets, Cloud SQL, Cloud Tasks, or

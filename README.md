@@ -370,10 +370,16 @@ Application task → Validibot worker → deterministic provider task
 - Attempt-scoped credentials and an authenticated HTTP callback when complete
 
 Production deployment is intentionally absent from this repository. Release
-the backend here, then use the `validibot` repository's
-`VALIDATOR_BACKEND_RELEASE_TAG=vX.Y.Z just gcp ...` recipes. Those recipes
-verify the signed tag, attestation, equal GHCR/GAR digest, provider revision,
-and IAM policy before registration or activation.
+the backend here, then use the `validibot` repository's complete staging and
+acceptance commands:
+
+```bash
+just gcp validator-deploy-all prod vX.Y.Z
+just gcp validator-acceptance prod vX.Y.Z
+```
+
+They verify the signed tag, attestation, equal GHCR/GAR digest, provider
+revision, and IAM policy before registration or activation.
 
 ## Container Registry Setup
 
