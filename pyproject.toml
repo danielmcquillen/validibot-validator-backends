@@ -39,9 +39,9 @@ dependencies = [
     "pydantic==2.13.4",
     "httpx==0.28.1",
     "google-cloud-storage==3.13.0",
-    "google-auth==2.56.0",
+    "google-auth==2.56.2",
     "requests==2.34.2",
-    "sentry-sdk==2.66.0",
+    "sentry-sdk==2.66.1",
     "validibot-shared==0.20.0",
 ]
 
@@ -50,7 +50,7 @@ dev = [
     "pytest==9.1.1",
     "pytest-mock==3.15.1",
     "pytest-cov==7.1.0",
-    "ruff==0.15.22",
+    "ruff==0.16.0",
     "mypy==2.3.0",
 ]
 
