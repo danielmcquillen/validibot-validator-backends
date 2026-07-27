@@ -56,6 +56,45 @@ Copyright (c) Dassault Systèmes
 Licensed under the BSD 2-Clause License
 https://github.com/CATIA-Systems/FMPy
 
+defusedxml (optional, for XML-bearing validators)
+Copyright (c) 2013-2020 Christian Heimes
+Licensed under the Python Software Foundation License
+https://github.com/tiran/defusedxml
+
+openpyxl (optional, for building benchmark XLSX reports)
+Copyright (c) openpyxl contributors
+Licensed under the MIT License
+https://foss.heptapod.net/openpyxl/openpyxl
+
+xlrd (optional, for building benchmark XLS reports)
+Copyright (c) xlrd contributors
+Licensed under the BSD 3-Clause License
+https://github.com/python-excel/xlrd
+
+RDFLib, pySHACL, OWL-RL, and lxml (optional, for SHACL validation)
+Licensed under their respective BSD 3-Clause, Apache 2.0, W3C, and
+BSD 3-Clause licenses. The generated image report and wheel license files
+provide the exact version-specific notices.
+
+SaxonC-HE (optional, for Schematron validation)
+Copyright Saxonica
+Licensed under the Mozilla Public License 2.0
+https://github.com/Saxonica/Saxon-HE
+
+SchXslt2 (vendored, for Schematron validation)
+Copyright (c) SchXslt contributors
+Licensed under the MIT License
+The vendored license is retained beside the transpiler and in the image.
+
+## Test Fixtures
+
+Anonymized Portfolio Manager-format XLS, XLSX, and XML test fixtures are
+derived from files in the SEED Platform repository at commit
+47202aa6a6346aec52af0f79344ac607472d2b1c. SEED is licensed under the
+BSD 3-Clause License. Exact source paths, transformation notes, checksums,
+and a copy of the upstream license are stored in
+validator_backends/portfolio_manager/tests/assets/.
+
 ## External Software (used in Docker images)
 
 EnergyPlus
@@ -74,3 +113,16 @@ Python Software Foundation License
 https://www.python.org/
 
 Each component is subject to its own license terms.
+
+ENERGY STAR® TRADEMARK NOTICE
+
+ENERGY STAR® and the ENERGY STAR mark are registered trademarks owned by the
+U.S. Environmental Protection Agency. The name ENERGY STAR® Portfolio Manager®
+and the Portfolio Manager logo are registered trademarks owned by the U.S.
+Environmental Protection Agency.
+
+Validibot is an independent project. It is not affiliated with, approved by,
+certified by, or endorsed by the U.S. Environmental Protection Agency or the
+ENERGY STAR program. The building benchmark report validator checks exported
+files; it does not award ENERGY STAR certification or make a regulatory
+compliance determination.

@@ -1,7 +1,7 @@
 """Runtime metadata for the Portfolio Manager validator image."""
 
 VALIDATOR_TYPE = "PORTFOLIO_MANAGER"
-VALIDATOR_NAME = "Portfolio Manager Validator"
+VALIDATOR_NAME = "Building Benchmark Report Validator"
 IMAGE_NAME = "validibot-validator-backend-portfolio-manager"
 SUPPORTED_INPUT_TYPES = [
     "application/vnd.ms-excel",

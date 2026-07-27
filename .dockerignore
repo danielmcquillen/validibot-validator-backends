@@ -10,6 +10,7 @@ htmlcov
 .venv
 venv
 __pycache__
+**/__pycache__
 *.py[cod]
 *.egg-info
 dist
@@ -32,3 +33,6 @@ logs
 *.log
 tmp
 temp
+
+# Runtime images copy source modules, never test suites or their binary fixtures.
+validator_backends/*/tests

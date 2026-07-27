@@ -42,7 +42,7 @@ dependencies = [
     "google-auth==2.56.0",
     "requests==2.34.2",
     "sentry-sdk==2.66.0",
-    "validibot-shared==0.20.0",
+    "validibot-shared==0.21.0",
 ]
 
 [project.optional-dependencies]
@@ -60,7 +60,10 @@ energyplus = [
 ]
 
 # FMU validator dependencies (for local dev/testing)
-fmu = ["fmpy==0.3.30"]
+fmu = [
+    "defusedxml==0.7.1",
+    "fmpy==0.3.30",
+]
 
 # SHACL validator dependencies (for local dev/testing). Pinned to match the
 # community validibot repo so behaviour is identical across the boundary.

@@ -1,0 +1,470 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "annotated-types-2@0.7.0",
+      "name": "annotated-types",
+      "purl": "pkg:pypi/annotated-types@0.7.0",
+      "type": "library",
+      "version": "0.7.0"
+    },
+    {
+      "bom-ref": "anyio-3@4.14.1",
+      "name": "anyio",
+      "purl": "pkg:pypi/anyio@4.14.1",
+      "type": "library",
+      "version": "4.14.1"
+    },
+    {
+      "bom-ref": "certifi-4@2026.6.17",
+      "name": "certifi",
+      "purl": "pkg:pypi/certifi@2026.6.17",
+      "type": "library",
+      "version": "2026.6.17"
+    },
+    {
+      "bom-ref": "cffi-5@2.1.0",
+      "name": "cffi",
+      "properties": [
+        {
+          "name": "uv:package:marker",
+          "value": "platform_python_implementation != 'PyPy'"
+        }
+      ],
+      "purl": "pkg:pypi/cffi@2.1.0",
+      "type": "library",
+      "version": "2.1.0"
+    },
+    {
+      "bom-ref": "charset-normalizer-6@3.4.9",
+      "name": "charset-normalizer",
+      "purl": "pkg:pypi/charset-normalizer@3.4.9",
+      "type": "library",
+      "version": "3.4.9"
+    },
+    {
+      "bom-ref": "cryptography-7@49.0.0",
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@49.0.0",
+      "type": "library",
+      "version": "49.0.0"
+    },
+    {
+      "bom-ref": "defusedxml-8@0.7.1",
+      "name": "defusedxml",
+      "purl": "pkg:pypi/defusedxml@0.7.1",
+      "type": "library",
+      "version": "0.7.1"
+    },
+    {
+      "bom-ref": "et-xmlfile-9@2.0.0",
+      "name": "et-xmlfile",
+      "purl": "pkg:pypi/et-xmlfile@2.0.0",
+      "type": "library",
+      "version": "2.0.0"
+    },
+    {
+      "bom-ref": "google-api-core-10@2.31.0",
+      "name": "google-api-core",
+      "purl": "pkg:pypi/google-api-core@2.31.0",
+      "type": "library",
+      "version": "2.31.0"
+    },
+    {
+      "bom-ref": "google-auth-11@2.56.0",
+      "name": "google-auth",
+      "purl": "pkg:pypi/google-auth@2.56.0",
+      "type": "library",
+      "version": "2.56.0"
+    },
+    {
+      "bom-ref": "google-cloud-core-12@2.6.0",
+      "name": "google-cloud-core",
+      "purl": "pkg:pypi/google-cloud-core@2.6.0",
+      "type": "library",
+      "version": "2.6.0"
+    },
+    {
+      "bom-ref": "google-cloud-storage-13@3.13.0",
+      "name": "google-cloud-storage",
+      "purl": "pkg:pypi/google-cloud-storage@3.13.0",
+      "type": "library",
+      "version": "3.13.0"
+    },
+    {
+      "bom-ref": "google-crc32c-14@1.8.0",
+      "name": "google-crc32c",
+      "purl": "pkg:pypi/google-crc32c@1.8.0",
+      "type": "library",
+      "version": "1.8.0"
+    },
+    {
+      "bom-ref": "google-resumable-media-15@2.10.0",
+      "name": "google-resumable-media",
+      "purl": "pkg:pypi/google-resumable-media@2.10.0",
+      "type": "library",
+      "version": "2.10.0"
+    },
+    {
+      "bom-ref": "googleapis-common-protos-16@1.75.0",
+      "name": "googleapis-common-protos",
+      "purl": "pkg:pypi/googleapis-common-protos@1.75.0",
+      "type": "library",
+      "version": "1.75.0"
+    },
+    {
+      "bom-ref": "h11-17@0.16.0",
+      "name": "h11",
+      "purl": "pkg:pypi/h11@0.16.0",
+      "type": "library",
+      "version": "0.16.0"
+    },
+    {
+      "bom-ref": "httpcore-18@1.0.9",
+      "name": "httpcore",
+      "purl": "pkg:pypi/httpcore@1.0.9",
+      "type": "library",
+      "version": "1.0.9"
+    },
+    {
+      "bom-ref": "httpx-19@0.28.1",
+      "name": "httpx",
+      "purl": "pkg:pypi/httpx@0.28.1",
+      "type": "library",
+      "version": "0.28.1"
+    },
+    {
+      "bom-ref": "idna-20@3.18",
+      "name": "idna",
+      "purl": "pkg:pypi/idna@3.18",
+      "type": "library",
+      "version": "3.18"
+    },
+    {
+      "bom-ref": "openpyxl-21@3.1.5",
+      "name": "openpyxl",
+      "purl": "pkg:pypi/openpyxl@3.1.5",
+      "type": "library",
+      "version": "3.1.5"
+    },
+    {
+      "bom-ref": "proto-plus-22@1.28.1",
+      "name": "proto-plus",
+      "purl": "pkg:pypi/proto-plus@1.28.1",
+      "type": "library",
+      "version": "1.28.1"
+    },
+    {
+      "bom-ref": "protobuf-23@7.35.1",
+      "name": "protobuf",
+      "purl": "pkg:pypi/protobuf@7.35.1",
+      "type": "library",
+      "version": "7.35.1"
+    },
+    {
+      "bom-ref": "pyasn1-24@0.6.4",
+      "name": "pyasn1",
+      "purl": "pkg:pypi/pyasn1@0.6.4",
+      "type": "library",
+      "version": "0.6.4"
+    },
+    {
+      "bom-ref": "pyasn1-modules-25@0.4.2",
+      "name": "pyasn1-modules",
+      "purl": "pkg:pypi/pyasn1-modules@0.4.2",
+      "type": "library",
+      "version": "0.4.2"
+    },
+    {
+      "bom-ref": "pycparser-26@3.0",
+      "name": "pycparser",
+      "properties": [
+        {
+          "name": "uv:package:marker",
+          "value": "implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'"
+        }
+      ],
+      "purl": "pkg:pypi/pycparser@3.0",
+      "type": "library",
+      "version": "3.0"
+    },
+    {
+      "bom-ref": "pydantic-27@2.13.4",
+      "name": "pydantic",
+      "purl": "pkg:pypi/pydantic@2.13.4",
+      "type": "library",
+      "version": "2.13.4"
+    },
+    {
+      "bom-ref": "pydantic-core-28@2.46.4",
+      "name": "pydantic-core",
+      "purl": "pkg:pypi/pydantic-core@2.46.4",
+      "type": "library",
+      "version": "2.46.4"
+    },
+    {
+      "bom-ref": "requests-29@2.34.2",
+      "name": "requests",
+      "purl": "pkg:pypi/requests@2.34.2",
+      "type": "library",
+      "version": "2.34.2"
+    },
+    {
+      "bom-ref": "sentry-sdk-30@2.66.0",
+      "name": "sentry-sdk",
+      "purl": "pkg:pypi/sentry-sdk@2.66.0",
+      "type": "library",
+      "version": "2.66.0"
+    },
+    {
+      "bom-ref": "typing-extensions-31@4.16.0",
+      "name": "typing-extensions",
+      "purl": "pkg:pypi/typing-extensions@4.16.0",
+      "type": "library",
+      "version": "4.16.0"
+    },
+    {
+      "bom-ref": "typing-inspection-32@0.4.2",
+      "name": "typing-inspection",
+      "purl": "pkg:pypi/typing-inspection@0.4.2",
+      "type": "library",
+      "version": "0.4.2"
+    },
+    {
+      "bom-ref": "urllib3-33@2.7.0",
+      "name": "urllib3",
+      "purl": "pkg:pypi/urllib3@2.7.0",
+      "type": "library",
+      "version": "2.7.0"
+    },
+    {
+      "bom-ref": "validibot-shared-34@0.21.0",
+      "name": "validibot-shared",
+      "purl": "pkg:pypi/validibot-shared@0.21.0",
+      "type": "library",
+      "version": "0.21.0"
+    },
+    {
+      "bom-ref": "xlrd-35@2.0.2",
+      "name": "xlrd",
+      "purl": "pkg:pypi/xlrd@2.0.2",
+      "type": "library",
+      "version": "2.0.2"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "annotated-types-2@0.7.0"
+    },
+    {
+      "dependsOn": [
+        "idna-20@3.18"
+      ],
+      "ref": "anyio-3@4.14.1"
+    },
+    {
+      "ref": "certifi-4@2026.6.17"
+    },
+    {
+      "dependsOn": [
+        "pycparser-26@3.0"
+      ],
+      "ref": "cffi-5@2.1.0"
+    },
+    {
+      "ref": "charset-normalizer-6@3.4.9"
+    },
+    {
+      "dependsOn": [
+        "cffi-5@2.1.0"
+      ],
+      "ref": "cryptography-7@49.0.0"
+    },
+    {
+      "ref": "defusedxml-8@0.7.1"
+    },
+    {
+      "ref": "et-xmlfile-9@2.0.0"
+    },
+    {
+      "dependsOn": [
+        "google-auth-11@2.56.0",
+        "googleapis-common-protos-16@1.75.0",
+        "proto-plus-22@1.28.1",
+        "protobuf-23@7.35.1",
+        "requests-29@2.34.2"
+      ],
+      "ref": "google-api-core-10@2.31.0"
+    },
+    {
+      "dependsOn": [
+        "cryptography-7@49.0.0",
+        "pyasn1-modules-25@0.4.2"
+      ],
+      "ref": "google-auth-11@2.56.0"
+    },
+    {
+      "dependsOn": [
+        "google-api-core-10@2.31.0",
+        "google-auth-11@2.56.0"
+      ],
+      "ref": "google-cloud-core-12@2.6.0"
+    },
+    {
+      "dependsOn": [
+        "google-api-core-10@2.31.0",
+        "google-auth-11@2.56.0",
+        "google-cloud-core-12@2.6.0",
+        "google-crc32c-14@1.8.0",
+        "google-resumable-media-15@2.10.0",
+        "requests-29@2.34.2"
+      ],
+      "ref": "google-cloud-storage-13@3.13.0"
+    },
+    {
+      "ref": "google-crc32c-14@1.8.0"
+    },
+    {
+      "dependsOn": [
+        "google-crc32c-14@1.8.0"
+      ],
+      "ref": "google-resumable-media-15@2.10.0"
+    },
+    {
+      "dependsOn": [
+        "protobuf-23@7.35.1"
+      ],
+      "ref": "googleapis-common-protos-16@1.75.0"
+    },
+    {
+      "ref": "h11-17@0.16.0"
+    },
+    {
+      "dependsOn": [
+        "certifi-4@2026.6.17",
+        "h11-17@0.16.0"
+      ],
+      "ref": "httpcore-18@1.0.9"
+    },
+    {
+      "dependsOn": [
+        "anyio-3@4.14.1",
+        "certifi-4@2026.6.17",
+        "httpcore-18@1.0.9",
+        "idna-20@3.18"
+      ],
+      "ref": "httpx-19@0.28.1"
+    },
+    {
+      "ref": "idna-20@3.18"
+    },
+    {
+      "dependsOn": [
+        "et-xmlfile-9@2.0.0"
+      ],
+      "ref": "openpyxl-21@3.1.5"
+    },
+    {
+      "dependsOn": [
+        "protobuf-23@7.35.1"
+      ],
+      "ref": "proto-plus-22@1.28.1"
+    },
+    {
+      "ref": "protobuf-23@7.35.1"
+    },
+    {
+      "ref": "pyasn1-24@0.6.4"
+    },
+    {
+      "dependsOn": [
+        "pyasn1-24@0.6.4"
+      ],
+      "ref": "pyasn1-modules-25@0.4.2"
+    },
+    {
+      "ref": "pycparser-26@3.0"
+    },
+    {
+      "dependsOn": [
+        "annotated-types-2@0.7.0",
+        "pydantic-core-28@2.46.4",
+        "typing-extensions-31@4.16.0",
+        "typing-inspection-32@0.4.2"
+      ],
+      "ref": "pydantic-27@2.13.4"
+    },
+    {
+      "dependsOn": [
+        "typing-extensions-31@4.16.0"
+      ],
+      "ref": "pydantic-core-28@2.46.4"
+    },
+    {
+      "dependsOn": [
+        "certifi-4@2026.6.17",
+        "charset-normalizer-6@3.4.9",
+        "idna-20@3.18",
+        "urllib3-33@2.7.0"
+      ],
+      "ref": "requests-29@2.34.2"
+    },
+    {
+      "dependsOn": [
+        "certifi-4@2026.6.17",
+        "urllib3-33@2.7.0"
+      ],
+      "ref": "sentry-sdk-30@2.66.0"
+    },
+    {
+      "ref": "typing-extensions-31@4.16.0"
+    },
+    {
+      "dependsOn": [
+        "typing-extensions-31@4.16.0"
+      ],
+      "ref": "typing-inspection-32@0.4.2"
+    },
+    {
+      "ref": "urllib3-33@2.7.0"
+    },
+    {
+      "dependsOn": [
+        "defusedxml-8@0.7.1",
+        "pydantic-27@2.13.4"
+      ],
+      "ref": "validibot-shared-34@0.21.0"
+    },
+    {
+      "ref": "xlrd-35@2.0.2"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "validibot-validator-backend-portfolio-manager@0.16.1",
+      "name": "validibot-validator-backend-portfolio-manager",
+      "properties": [
+        {
+          "name": "io.validibot.validator-backend.slug",
+          "value": "portfolio_manager"
+        },
+        {
+          "name": "io.validibot.shared-contract.version",
+          "value": "0.21.0"
+        }
+      ],
+      "type": "application",
+      "version": "0.16.1"
+    },
+    "tools": [
+      {
+        "name": "uv",
+        "vendor": "Astral Software Inc.",
+        "version": "0.11.19"
+      }
+    ]
+  },
+  "serialNumber": "urn:uuid:73ff5361-cc8c-5819-a449-6461a8e2b4af",
+  "specVersion": "1.5",
+  "version": 1
+}

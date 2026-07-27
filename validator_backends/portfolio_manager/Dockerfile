@@ -1,12 +1,14 @@
-# Isolated low-compute backend for untrusted Portfolio Manager XLS/XLSX/XML/ZIP.
-FROM python:3.13-slim
+# Isolated low-compute backend for untrusted ENERGY STAR Portfolio Manager
+# XLS/XLSX/XML/ZIP exports.
+FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91
 
-ARG VALIDATOR_BACKEND_VERSION="0.16.0"
+# Every build passes this backend's release_version from backends.toml.
+ARG VALIDATOR_BACKEND_VERSION
 ARG VALIDATOR_BACKEND_REVISION="unknown"
 ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="portfolio_manager"
 
-LABEL org.opencontainers.image.title="Validibot Portfolio Manager validator backend" \
+LABEL org.opencontainers.image.title="Validibot building benchmark report validator backend" \
       org.opencontainers.image.version="${VALIDATOR_BACKEND_VERSION}" \
       org.opencontainers.image.revision="${VALIDATOR_BACKEND_REVISION}" \
       org.opencontainers.image.source="${VALIDATOR_BACKEND_SOURCE}" \
@@ -15,13 +17,42 @@ LABEL org.opencontainers.image.title="Validibot Portfolio Manager validator back
 WORKDIR /app
 ENV PYTHONPATH=/app
 
-COPY validator_backends/portfolio_manager/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY validator_backends/portfolio_manager/requirements.lock /tmp/requirements.lock
+RUN python -m pip install --no-cache-dir --require-hashes --no-deps \
+        -r /tmp/requirements.lock \
+    && rm /tmp/requirements.lock
+
+# Bundle first-party terms, the lock-derived application SBOM, and a generated
+# report for the Python distributions actually installed in this image.
+RUN mkdir -p /app/legal
+COPY LICENSE NOTICE /app/legal/
+COPY validator_backends/portfolio_manager/legal/APPLICATION-SBOM.cdx.json \
+    /app/legal/APPLICATION-SBOM.cdx.json
+COPY legal/license-policy.toml /tmp/license-policy.toml
+COPY scripts/generate_legal_artifacts.py /tmp/generate_legal_artifacts.py
+RUN python /tmp/generate_legal_artifacts.py \
+        --policy /tmp/license-policy.toml \
+        --output-dir /app/legal \
+        --component-name "validibot-validator-backend-portfolio-manager" \
+        --component-version "${VALIDATOR_BACKEND_VERSION}" \
+    && rm /tmp/license-policy.toml /tmp/generate_legal_artifacts.py
 
 RUN groupadd --gid 1000 validibot \
     && useradd --uid 1000 --gid 1000 --no-create-home validibot
 
-COPY --chown=validibot:validibot validator_backends /app/validator_backends
+# Copy only the package marker, shared runtime, and this backend. The root
+# .dockerignore excludes tests and caches inside these directories. Keeping
+# unrelated backends out of the image prevents their fixtures and optional
+# runtime material from becoming part of this release artifact.
+RUN mkdir -p /app/validator_backends/core \
+        /app/validator_backends/portfolio_manager \
+    && chown -R validibot:validibot /app/validator_backends
+COPY --chown=validibot:validibot validator_backends/__init__.py \
+    /app/validator_backends/__init__.py
+COPY --chown=validibot:validibot validator_backends/core/*.py \
+    /app/validator_backends/core/
+COPY --chown=validibot:validibot validator_backends/portfolio_manager/*.py \
+    /app/validator_backends/portfolio_manager/
 
 USER validibot
 CMD ["python", "-m", "validator_backends.core.entrypoint", "--backend-module", "validator_backends.portfolio_manager.main"]

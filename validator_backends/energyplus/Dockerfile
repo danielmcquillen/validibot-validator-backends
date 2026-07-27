@@ -17,7 +17,6 @@ FROM ubuntu:22.04 AS energyplus-builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install EnergyPlus 25.2.0 (latest as of Dec 2024)
@@ -31,7 +30,7 @@ RUN wget -q https://github.com/NREL/EnergyPlus/releases/download/v25.2.0/EnergyP
 # =============================================================================
 # Stage 2: Runtime container
 # =============================================================================
-FROM python:3.13-slim
+FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91
 
 # Backend wrapper version. This is OUR backend's version — bump it when the
 # wrapper code, image layout, or output semantics change. It is INTENTIONALLY
@@ -39,9 +38,9 @@ FROM python:3.13-slim
 # 25.2.0, downloaded above) — the upstream library can stay pinned while we
 # iterate on the wrapper, and vice versa.
 #
-# Build-arg override is supported for release-engineering edge cases:
-#   docker build --build-arg VALIDATOR_BACKEND_VERSION=0.1.1-rc1 ...
-ARG VALIDATOR_BACKEND_VERSION="0.15.1"
+# Every build passes the release_version read from backends.toml. Keeping no
+# default here prevents the Dockerfile from becoming a second version authority.
+ARG VALIDATOR_BACKEND_VERSION
 ARG VALIDATOR_BACKEND_REVISION="unknown"
 ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="energyplus"
@@ -55,12 +54,10 @@ LABEL org.opencontainers.image.title="Validibot EnergyPlus validator backend" \
 # Install runtime dependencies
 # - libgomp1: OpenMP runtime for parallel processing
 # - libx11-6, libxext6: X11 libs required by EnergyPlus binary
-# - git: needed for pip install from GitHub
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libx11-6 \
     libxext6 \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy EnergyPlus from builder stage (includes LICENSE.txt for BSD-3-Clause compliance)
@@ -80,19 +77,43 @@ WORKDIR /app
 ENV PYTHONPATH=/app
 
 # Copy requirements first (for layer caching)
-COPY validator_backends/energyplus/requirements.txt .
+COPY validator_backends/energyplus/requirements.lock /tmp/requirements.lock
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --require-hashes --no-deps \
+        -r /tmp/requirements.lock \
+    && rm /tmp/requirements.lock
+
+RUN mkdir -p /app/legal
+COPY LICENSE NOTICE /app/legal/
+COPY validator_backends/energyplus/legal/APPLICATION-SBOM.cdx.json \
+    /app/legal/APPLICATION-SBOM.cdx.json
+COPY legal/license-policy.toml /tmp/license-policy.toml
+COPY scripts/generate_legal_artifacts.py /tmp/generate_legal_artifacts.py
+RUN python /tmp/generate_legal_artifacts.py \
+        --policy /tmp/license-policy.toml \
+        --output-dir /app/legal \
+        --component-name "validibot-validator-backend-energyplus" \
+        --component-version "${VALIDATOR_BACKEND_VERSION}" \
+    && rm /tmp/license-policy.toml /tmp/generate_legal_artifacts.py
 
 # Create non-root user for container execution
 RUN groupadd --gid 1000 validibot \
     && useradd --uid 1000 --gid 1000 --no-create-home validibot
 
-# Copy the entire validator_backends package (includes core, energyplus, and __init__.py)
-# --chown ensures files are readable by the non-root user (UID 1000) when the
-# Docker runner launches the container with user=1000:1000 and read_only=True.
-COPY --chown=validibot:validibot validator_backends /app/validator_backends
+# Copy only the package marker, shared runtime, and this backend. The root
+# .dockerignore excludes tests and caches inside these directories. Keeping
+# unrelated backends out of the image prevents their fixtures and optional
+# runtime material from becoming part of this release artifact.
+RUN mkdir -p /app/validator_backends/core \
+        /app/validator_backends/energyplus \
+    && chown -R validibot:validibot /app/validator_backends
+COPY --chown=validibot:validibot validator_backends/__init__.py \
+    /app/validator_backends/__init__.py
+COPY --chown=validibot:validibot validator_backends/core/*.py \
+    /app/validator_backends/core/
+COPY --chown=validibot:validibot validator_backends/energyplus/*.py \
+    /app/validator_backends/energyplus/
 
 # Create working directory for EnergyPlus runs (writable by validibot user)
 # Note: when run with read_only=True + tmpfs on /tmp, this directory is

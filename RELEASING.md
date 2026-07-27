@@ -23,6 +23,9 @@ Available backends today:
 
 - `ghcr.io/danielmcquillen/validibot-validator-backend-energyplus`
 - `ghcr.io/danielmcquillen/validibot-validator-backend-fmu`
+- `ghcr.io/danielmcquillen/validibot-validator-backend-shacl`
+- `ghcr.io/danielmcquillen/validibot-validator-backend-schematron`
+- `ghcr.io/danielmcquillen/validibot-validator-backend-portfolio-manager`
 
 Each release publishes both `:vX.Y.Z` (immutable, recommended for
 production) and `:latest` (mutable convenience pointer for
@@ -32,18 +35,18 @@ development).
 
 The Docker containers do not read `VALIDATOR_VERSION` or
 `VALIDATOR_BACKEND_VERSION` at runtime. The version is **image metadata
-only** — baked into the OCI labels at build time from the Dockerfile's
-`ARG VALIDATOR_BACKEND_VERSION` default:
+only**. The release workflow reads `release_version` from `backends.toml` and
+passes it to the Dockerfile:
 
 - `org.opencontainers.image.version` ← `ARG VALIDATOR_BACKEND_VERSION`
-  (the Dockerfile default)
+  (the matching `backends.toml` `release_version`)
 - `org.opencontainers.image.revision` ← the commit SHA used for the
   build (passed in by the recipe)
 - `io.validibot.validator-backend.slug` identifies which backend the
   image implements (`energyplus`, `fmu`, …)
 
-There's no Python-side `BACKEND_IMAGE_VERSION` constant and no separate
-version file. The Dockerfile is the single source of truth.
+There's no Python-side `BACKEND_IMAGE_VERSION` constant, Dockerfile default,
+or separate version file. `backends.toml` is the single source of truth.
 
 ### Wrapper version vs bundled-library version
 
@@ -57,51 +60,41 @@ A fresh release ships these values:
 
 | Backend | Wrapper version | Bundled library |
 |---|---|---|
-| EnergyPlus | `0.1.0` (Dockerfile default) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
-| FMU | `0.1.0` (Dockerfile default) | fmpy (pinned in `requirements.txt`) |
+| EnergyPlus | `0.15.1` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
+| FMU | `0.15.1` (`backends.toml`) | fmpy (pinned in `requirements.txt`) |
 
 Bumping the wrapper version does NOT imply bumping the bundled library,
 and vice versa. They iterate independently.
 
 ### Bumping a backend's version
 
-Edit the Dockerfile's `ARG` default — that's the only change required:
+Edit only the backend's `release_version` in `backends.toml`:
 
-```dockerfile
-# validator_backends/fmu/Dockerfile
-ARG VALIDATOR_BACKEND_VERSION="0.1.1"   # was "0.1.0"
+```toml
+[[backend]]
+slug = "fmu"
+release_version = "0.15.2"
 ```
 
-The next `just build fmu` (or `just build-push fmu`) stamps the new
-version onto the image. Different backends can have different version
-labels in the same repo release; they're independent files.
+The next `just build fmu` stamps `0.15.2`. A signed
+`fmu-v0.15.2` tag tests and publishes only FMU; it does not build another
+backend.
 
 ### Manual builds
 
-If you build manually instead of using the just recipes, pass the
-build-arg only when overriding the Dockerfile default — release-engineering
-edge cases like RC builds:
+If you build manually instead of using the just recipes, read the version from
+the inventory and pass it explicitly:
 
 ```bash
-# Use the Dockerfile default (the canonical version):
+VERSION="$(python3 scripts/backend_inventory.py field fmu release_version)"
 docker buildx build \
   --platform linux/amd64 \
   --load \
   -f validator_backends/fmu/Dockerfile \
+  --build-arg VALIDATOR_BACKEND_VERSION="$VERSION" \
   --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
   --build-arg VALIDATOR_BACKEND_SLUG=fmu \
-  -t validibot-validator-backend-fmu:0.1.0 \
-  .
-
-# Stamp an RC version instead:
-docker buildx build \
-  --platform linux/amd64 \
-  --load \
-  -f validator_backends/fmu/Dockerfile \
-  --build-arg VALIDATOR_BACKEND_VERSION=0.1.1-rc1 \
-  --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
-  --build-arg VALIDATOR_BACKEND_SLUG=fmu \
-  -t validibot-validator-backend-fmu:0.1.1-rc1 \
+  -t "validibot-validator-backend-fmu:v$VERSION" \
   .
 ```
 
@@ -131,11 +124,11 @@ implicitly verifies the source commit.
 # Pull the image. For production, prefer pinning by digest rather
 # than tag — operators running with VALIDATOR_BACKEND_IMAGE_POLICY=digest
 # require this anyway.
-docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.6.0
+docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1
 
 # Resolve the digest:
 DIGEST=$(crane digest \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.6.0)
+  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1)
 echo "Image digest: $DIGEST"
 
 # Verify the sigstore attestation against the digest. This
@@ -186,8 +179,8 @@ billing), mirror the digest to your registry:
 brew install crane   # or download from go-containerregistry releases
 
 crane copy \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.6.0 \
-  111122223333.dkr.ecr.us-west-2.amazonaws.com/validibot-validator-backend-energyplus:v0.6.0
+  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1 \
+  111122223333.dkr.ecr.us-west-2.amazonaws.com/validibot-validator-backend-energyplus:v0.15.1
 ```
 
 The image digest is preserved across the copy, so
@@ -199,16 +192,16 @@ name.
 
 ```bash
 # On an internet-connected transit host:
-docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.6.0
+docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1
 gh attestation verify \
-  "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.6.0" \
+  "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1" \
   --owner danielmcquillen
-docker save -o energyplus-v0.6.0.tar \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.6.0
+docker save -o energyplus-v0.15.1.tar \
+  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1
 
 # Transfer the tarball through your air-gap process. On the
 # air-gapped host:
-docker load -i energyplus-v0.6.0.tar
+docker load -i energyplus-v0.15.1.tar
 ```
 
 Verification happens at the network boundary (the transit host),
@@ -219,7 +212,7 @@ the sigstore transparency log.
 
 For each backend, every signed-tag release publishes:
 
-1. **A signed git tag** (`vX.Y.Z`) verifiable via
+1. **A backend-specific signed git tag** (`<backend>-vX.Y.Z`) verifiable via
    `git verify-tag`.
 2. **Two image tags on GHCR**: `vX.Y.Z` (immutable) and `latest`
    (mutable).
@@ -228,12 +221,28 @@ For each backend, every signed-tag release publishes:
 4. **A SLSA in-toto provenance attestation** embedded in the OCI
    image manifest itself, queryable via
    `docker buildx imagetools inspect <ref> --format '{{ json .Provenance }}'`.
-5. **A SPDX SBOM** embedded in the OCI image manifest, queryable
+5. **A SPDX image SBOM** embedded in the OCI image manifest, queryable
    via `docker buildx imagetools inspect <ref> --format '{{ json .SBOM }}'`.
-6. **A standalone SBOM artifact** attached to the GitHub release
+6. **A standalone image SBOM artifact** attached to the GitHub release
    page (`validibot-validator-backend-<validator>.spdx.json`) for
    tools that prefer fetching SBOMs from a release page rather
    than from the registry.
+7. **A lock-derived CycloneDX application SBOM** embedded at
+   `/app/legal/APPLICATION-SBOM.cdx.json` and attached to the GitHub release.
+   The image also contains `LICENSE`, `NOTICE`, the generated
+   `THIRD-PARTY-LICENSES.md`, and copied wheel license files under `/app/legal`.
+8. **An attested backend release JSON** named
+   `validibot-validator-backend-<validator>-vX.Y.Z.json`, plus its SHA-256
+   checksum. The JSON records the exact source tag, source commit, image
+   digest, shared contract, image-SBOM filename, and build-verification
+   reference. The application SBOM remains a separate release artifact rather
+   than a second field in the strict release-record schema.
+
+Before tagging, run `uv run python scripts/backend_artifacts.py check` and
+`uv run python scripts/generate_legal_artifacts.py --policy
+legal/license-policy.toml --check-only`. Release CI repeats both checks and
+stops when generated locks/SBOMs are stale or an installed distribution has an
+unknown or unapproved license.
 
 ## Checking image integrity in CI
 
@@ -244,7 +253,7 @@ add an attestation-verify step before deploy:
 - name: Verify validator backend image
   run: |
     DIGEST=$(crane digest \
-      ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.6.0)
+      ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1)
     gh attestation verify \
       "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus@$DIGEST" \
       --owner danielmcquillen

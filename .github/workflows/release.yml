@@ -1,76 +1,19 @@
-# Release workflow for validator backends.
+# Release exactly one validator backend from a backend-specific signed tag.
 #
-# On a signed-tag push (``v*``), build each validator backend image
-# with full supply-chain provenance:
-#
-# 1. **OIDC build attestation** — ``actions/attest-build-provenance``
-#    produces a sigstore-style attestation linking the image digest
-#    to *this exact* GitHub Actions run. Verifiers running
-#    ``VALIDATOR_BACKEND_IMAGE_POLICY=signed-digest`` against a
-#    deployment can then check the image was built by Validibot CI
-#    via ``gh attestation verify``.
-# 2. **SBOM (SPDX)** — ``docker/build-push-action`` with
-#    ``sbom: true`` embeds a SPDX SBOM into the OCI image manifest
-#    via BuildKit's attestation API. The SBOM is also extracted and
-#    attached to the GitHub Release for tools that prefer fetching
-#    SBOMs from a release page rather than the registry.
-# 3. **Signed-tag verification** — the workflow refuses to build if
-#    the triggering tag is unsigned. Combined with branch protection,
-#    this means the only way to push a release image is from a
-#    maintainer's signed commit.
-#
-# Default registry: GitHub Container Registry (GHCR)
-# ===================================================
-#
-# Validibot's open-core promise is "free for everyone." Validator
-# backend images are part of that promise — anyone running self-hosted
-# community Validibot must be able to ``docker pull`` an official
-# image without paying for a third party's registry egress.
-#
-# GHCR is free for public images, has no rate limit on anonymous
-# pulls of public artefacts, lives in the same GitHub org as the
-# repo, and authenticates via the ambient ``GITHUB_TOKEN`` — no
-# extra secrets required for the default path.
-#
-# Image references published per release:
-#
-#     ghcr.io/<owner>/validibot-validator-backend-<validator>:vX.Y.Z
-#     ghcr.io/<owner>/validibot-validator-backend-<validator>:latest
-#
-# Optional secondary push: Google Artifact Registry (GAR)
-# ========================================================
-#
-# Cloud (validibot.com) prefers running validator backend images out
-# of a private GAR repo for deploy-time reasons (latency to Cloud Run
-# Jobs, billing, IAM). When the operator configures the GAR variables
-# below, the workflow *also* pushes the same digest to GAR after the
-# GHCR push succeeds. The GHCR copy remains the public source of
-# truth; GAR is a deployment-channel mirror.
-#
-# Optional GAR configuration (when set, the secondary push fires;
-# when missing, the GHCR-only path is the whole release):
-#
-#   Variables:
-#     GCP_PROJECT_ID
-#     GCP_REGION
-#     GCP_GAR_REPOSITORY
-#   Secrets:
-#     GCP_WORKLOAD_IDENTITY_PROVIDER
-#     GCP_SERVICE_ACCOUNT_EMAIL
-#
-# When the GAR vars/secrets are unset, the workflow skips the GAR
-# step cleanly — the expected state for a fresh fork or a
-# community-only operator who doesn't need a private mirror.
+# A tag such as ``energyplus-v0.17.0`` is accepted only when the EnergyPlus
+# entry in ``backends.toml`` is release-enabled and its ``release_version`` is
+# exactly ``0.17.0``. The selected image is built once, by digest, and the
+# workflow publishes its SBOM plus one attested backend release JSON record.
 
-name: Release validator backend images
+name: Release validator backend image
 
 on:
   push:
-    tags: ['v*']
+    tags: ["*-v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v1.2.3)'
+        description: "Existing signed backend tag (for example energyplus-v0.17.0)"
         required: true
         type: string
 
@@ -78,259 +21,245 @@ permissions:
   contents: read
 
 jobs:
-  verify-signed-tag:
-    name: Verify tag signature and create release
+  select-release:
+    name: Verify backend release identity
     runs-on: ubuntu-latest
-    permissions:
-      # ``contents: write`` lets us create the GitHub release that
-      # the parallel matrix jobs below will attach SBOMs to. Doing
-      # this once here (before the matrix) avoids the race
-      # condition that would happen if each matrix job tried to
-      # create the release in parallel.
-      contents: write
+    outputs:
+      backend: ${{ steps.inventory.outputs.backend }}
+      version: ${{ steps.inventory.outputs.version }}
+      source_tag: ${{ steps.inventory.outputs.source_tag }}
+      dockerfile: ${{ steps.inventory.outputs.dockerfile }}
+      requirements: ${{ steps.inventory.outputs.requirements }}
+      requirements_lock: ${{ steps.inventory.outputs.requirements_lock }}
+      application_sbom: ${{ steps.inventory.outputs.application_sbom }}
+      test_path: ${{ steps.inventory.outputs.test_path }}
+      image_name: ${{ steps.inventory.outputs.image_name }}
+      shared_contract: ${{ steps.inventory.outputs.shared_contract }}
+      platform: ${{ steps.inventory.outputs.platform }}
+      sbom: ${{ steps.inventory.outputs.sbom }}
+      release_record: ${{ steps.inventory.outputs.release_record }}
 
     steps:
-      - name: Checkout (full history for tag verification)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Checkout full tag history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
 
-      # Configure git so ``git verify-tag`` knows where the
-      # repo's allowed-signers file lives. Without this step,
-      # ``git verify-tag`` fails with "gpg.ssh.allowedSignersFile
-      # needs to be configured" because git defaults to GPG
-      # signature verification on a fresh CI runner.
-      - name: Configure git for SSH signature verification
+      - name: Configure SSH tag verification
         run: |
-          if [ -f .allowed_signers ]; then
-            git config gpg.ssh.allowedSignersFile "$PWD/.allowed_signers"
-            git config gpg.format ssh
-          else
-            echo "::error::Repo is missing .allowed_signers; cannot verify signed tags."
+          test -f .allowed_signers || {
+            echo "::error::Repo is missing .allowed_signers."
             exit 1
-          fi
+          }
+          git config gpg.ssh.allowedSignersFile "$PWD/.allowed_signers"
+          git config gpg.format ssh
 
-      # Refuse unsigned tags. The
-      # check fails when ``git verify-tag`` exits non-zero, which
-      # happens for unsigned tags or tags signed by a key not in
-      # the repo's allowed-signers config.
-      #
-      # ``TAG_REF`` is bound via env (not interpolated into the
-      # script body) — recommended practice for any input from a
-      # GitHub event payload.
-      - name: Verify tag is signed
+      - name: Verify signed tag
         env:
-          TAG_REF: ${{ inputs.tag || github.ref_name }}
-        run: |
-          if ! git verify-tag "$TAG_REF" 2>&1; then
-            echo "::error::Tag '$TAG_REF' is not signed."
-            echo "Sign with: git tag -s '$TAG_REF' -m 'release notes'"
-            echo "Or use the maintainer recipe: just release X.Y.Z"
-            exit 1
-          fi
-          echo "Tag '$TAG_REF' signature verified."
-
-      # Create the GitHub release here (idempotent) so the
-      # parallel matrix jobs can ``gh release upload`` SBOM files
-      # without having to coordinate creation.
-      - name: Create or update GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if ! git verify-tag "$RELEASE_TAG"; then
+            echo "::error::Tag '$RELEASE_TAG' is not signed by an allowed key."
+            exit 1
+          fi
+
+      - name: Validate inventory and select one backend
+        id: inventory
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          python3 scripts/backend_inventory.py validate >/dev/null
+          python3 scripts/backend_inventory.py release "$RELEASE_TAG" \
+            --github-output "$GITHUB_OUTPUT"
+
+  test-selected-backend:
+    name: Test ${{ needs.select-release.outputs.backend }}
+    needs: select-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.19"
+
+      - name: Install selected backend dependencies
+        env:
+          BACKEND: ${{ needs.select-release.outputs.backend }}
+        run: |
+          uv python install 3.13
+          uv sync --frozen --extra dev --extra "$BACKEND"
+
+      - name: Verify locked dependencies, application SBOM, and license policy
+        env:
+          BACKEND: ${{ needs.select-release.outputs.backend }}
+        run: |
+          uv run python scripts/backend_artifacts.py check --backend "$BACKEND"
+          uv run python scripts/generate_legal_artifacts.py \
+            --policy legal/license-policy.toml \
+            --check-only
+
+      - name: Run inventory, shared-core, and selected backend tests
+        env:
+          TEST_PATH: ${{ needs.select-release.outputs.test_path }}
+        run: |
+          uv run pytest tests validator_backends/core/tests "$TEST_PATH"
+
+  build-and-publish:
+    name: Publish ${{ needs.select-release.outputs.backend }} v${{ needs.select-release.outputs.version }}
+    needs: [select-release, test-selected-backend]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute immutable image references
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE_NAME: ${{ needs.select-release.outputs.image_name }}
+          VERSION: ${{ needs.select-release.outputs.version }}
+        run: |
+          OWNER_LC="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          IMAGE="ghcr.io/${OWNER_LC}/${IMAGE_NAME}"
+          {
+            echo "name=$IMAGE"
+            echo "version_tag=v${VERSION}"
+            echo "version_ref=${IMAGE}:v${VERSION}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push selected image
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ${{ needs.select-release.outputs.dockerfile }}
+          platforms: ${{ needs.select-release.outputs.platform }}
+          push: true
+          tags: |
+            ${{ steps.image.outputs.version_ref }}
+            ${{ steps.image.outputs.name }}:latest
+          build-args: |
+            VALIDATOR_BACKEND_VERSION=${{ needs.select-release.outputs.version }}
+            VALIDATOR_BACKEND_REVISION=${{ github.sha }}
+            VALIDATOR_BACKEND_SOURCE=https://github.com/${{ github.repository }}
+            VALIDATOR_BACKEND_SLUG=${{ needs.select-release.outputs.backend }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Attest exact image digest
+        id: image-attestation
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate standalone SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: ${{ needs.select-release.outputs.sbom }}
+          upload-artifact: false
+
+      - name: Generate backend release JSON
+        env:
+          BACKEND: ${{ needs.select-release.outputs.backend }}
+          VERSION: ${{ needs.select-release.outputs.version }}
+          SOURCE_TAG: ${{ needs.select-release.outputs.source_tag }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          IMAGE: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          SHARED_CONTRACT: ${{ needs.select-release.outputs.shared_contract }}
+          SBOM: ${{ needs.select-release.outputs.sbom }}
+          BUILD_VERIFICATION: ${{ steps.image-attestation.outputs.attestation-url }}
+          RELEASE_RECORD: ${{ needs.select-release.outputs.release_record }}
+        run: |
+          jq -n \
+            --arg schema_version "validibot.backend-release.v1" \
+            --arg backend "$BACKEND" \
+            --arg version "$VERSION" \
+            --arg source_tag "$SOURCE_TAG" \
+            --arg source_commit "$SOURCE_COMMIT" \
+            --arg image "$IMAGE" \
+            --arg image_digest "$IMAGE_DIGEST" \
+            --arg shared_contract "$SHARED_CONTRACT" \
+            --arg sbom "$SBOM" \
+            --arg build_verification "$BUILD_VERIFICATION" \
+            '{
+              schema_version: $schema_version,
+              backend: $backend,
+              version: $version,
+              source_tag: $source_tag,
+              source_commit: $source_commit,
+              image: $image,
+              image_digest: $image_digest,
+              shared_contract: $shared_contract,
+              sbom: $sbom,
+              build_verification: $build_verification
+            }' > "$RELEASE_RECORD"
+          sha256sum "$RELEASE_RECORD" > "${RELEASE_RECORD}.sha256"
+
+      - name: Attest backend release JSON
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: ${{ needs.select-release.outputs.release_record }}
+
+      - name: Upload release artifacts to workflow run
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.select-release.outputs.source_tag }}
+          path: |
+            ${{ needs.select-release.outputs.sbom }}
+            ${{ needs.select-release.outputs.application_sbom }}
+            ${{ needs.select-release.outputs.release_record }}
+            ${{ needs.select-release.outputs.release_record }}.sha256
+          retention-days: 90
+
+      - name: Create backend-specific GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.select-release.outputs.source_tag }}
+          SBOM: ${{ needs.select-release.outputs.sbom }}
+          APPLICATION_SBOM: ${{ needs.select-release.outputs.application_sbom }}
+          RELEASE_RECORD: ${{ needs.select-release.outputs.release_record }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$RELEASE_TAG" \
               --generate-notes \
               --verify-tag
           fi
-
-  build-and-publish:
-    name: Build, sign, and push ${{ matrix.validator }}
-    needs: verify-signed-tag
-    runs-on: ubuntu-latest
-    strategy:
-      # Don't cancel sibling matrix jobs when one fails — operators
-      # debugging a release want to see all the failure modes at once.
-      fail-fast: false
-      matrix:
-        # Keep in sync with `validators` in the justfile — every validator
-        # that ships as a container must be published to GHCR on release.
-        validator: [energyplus, fmu, shacl, schematron, portfolio_manager]
-
-    permissions:
-      # Required for OIDC token exchange (used by GHCR push, GCP
-      # WIF auth, AND the build-provenance attestation step).
-      id-token: write
-      # Required for ``actions/attest-build-provenance`` to write
-      # attestations to the repo's transparency log.
-      attestations: write
-      # Required for the SBOM upload step at the end.
-      contents: write
-      # Required to push images to GHCR.
-      packages: write
-
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
-
-      # ── Primary registry: GHCR (always pushed) ────────────────────
-      #
-      # GHCR auth uses the ambient GITHUB_TOKEN — no operator-
-      # provided secret needed. The repo-owner namespace is derived
-      # from ``github.repository_owner`` so forks publish under
-      # their own namespace automatically.
-      - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compute image references
-        id: image-ref
-        env:
-          OWNER: ${{ github.repository_owner }}
-          VALIDATOR: ${{ matrix.validator }}
-          TAG_REF: ${{ inputs.tag || github.ref_name }}
-        run: |
-          # GHCR namespace requires lower-case owner; normalise.
-          OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
-          VALIDATOR_IMAGE_SLUG="${VALIDATOR//_/-}"
-          GHCR_IMAGE="ghcr.io/${OWNER_LC}/validibot-validator-backend-${VALIDATOR_IMAGE_SLUG}"
-          {
-            echo "ghcr_image=${GHCR_IMAGE}"
-            echo "tag=${TAG_REF}"
-            echo "ghcr_full_ref=${GHCR_IMAGE}:${TAG_REF}"
-          } >> "$GITHUB_OUTPUT"
-
-      # Single build that emits the
-      # image, an OCI-attached SBOM (SPDX), and BuildKit provenance.
-      # ``attest-build-provenance`` (next step) layers the
-      # sigstore-signed attestation on top of the digest this step
-      # outputs.
-      - name: Build and push to GHCR with SBOM
-        id: build-push-ghcr
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
-        with:
-          context: .
-          file: validator_backends/${{ matrix.validator }}/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ steps.image-ref.outputs.ghcr_full_ref }}
-            ${{ steps.image-ref.outputs.ghcr_image }}:latest
-          # SLSA build provenance and SBOM as image-attached
-          # attestations — verifiers running
-          # ``cosign verify-attestation`` can pull both from the
-          # registry alongside the image digest.
-          provenance: mode=max
-          sbom: true
-
-      - name: Generate sigstore attestation for GHCR image digest
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
-        with:
-          subject-name: ${{ steps.image-ref.outputs.ghcr_image }}
-          subject-digest: ${{ steps.build-push-ghcr.outputs.digest }}
-          push-to-registry: true
-
-      # ── Optional secondary registry: Google Artifact Registry ─────
-      #
-      # When the operator has set the GAR variables and secrets, the
-      # workflow also publishes the same image digest to a private
-      # GAR repo (e.g. for cloud's deploy-time pulls). The
-      # ``actions/attest-build-provenance`` already wrote the
-      # sigstore attestation against the GHCR digest, but since the
-      # image bytes are identical (same build, same digest) the same
-      # attestation verifies for the GAR copy too.
-      #
-      # The ``if: vars.GCP_PROJECT_ID != ''`` gate makes this step a
-      # no-op for forks / community operators who only want the GHCR
-      # path.
-      - name: Authenticate to Google Cloud (Workload Identity Federation)
-        if: vars.GCP_PROJECT_ID != ''
-        id: gcp-auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Configure Docker for Artifact Registry
-        if: vars.GCP_PROJECT_ID != ''
-        env:
-          GCP_REGION: ${{ vars.GCP_REGION }}
-        run: |
-          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
-
-      - name: Mirror image from GHCR to GAR
-        if: vars.GCP_PROJECT_ID != ''
-        env:
-          GHCR_IMAGE: ${{ steps.image-ref.outputs.ghcr_image }}
-          GHCR_DIGEST: ${{ steps.build-push-ghcr.outputs.digest }}
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_GAR_REPOSITORY: ${{ vars.GCP_GAR_REPOSITORY }}
-          VALIDATOR: ${{ matrix.validator }}
-          TAG_REF: ${{ inputs.tag || github.ref_name }}
-        run: |
-          GAR_REGISTRY="${GCP_REGION}-docker.pkg.dev"
-          VALIDATOR_IMAGE_SLUG="${VALIDATOR//_/-}"
-          GAR_IMAGE="${GAR_REGISTRY}/${GCP_PROJECT_ID}/${GCP_GAR_REPOSITORY}/validibot-validator-backend-${VALIDATOR_IMAGE_SLUG}"
-          # ``crane`` copies the image manifest + layers verbatim,
-          # preserving the digest. Re-pushing via ``docker push``
-          # would rebuild and the digest would drift; crane is the
-          # right tool for "same bytes, different registry."
-          curl -sSfL https://github.com/google/go-containerregistry/releases/download/v0.20.6/go-containerregistry_Linux_x86_64.tar.gz \
-            | tar -xz -C /usr/local/bin crane
-          crane copy \
-            "${GHCR_IMAGE}@${GHCR_DIGEST}" \
-            "${GAR_IMAGE}:${TAG_REF}"
-          crane copy \
-            "${GHCR_IMAGE}@${GHCR_DIGEST}" \
-            "${GAR_IMAGE}:latest"
-
-      # ── SBOM extraction + release page upload (always runs) ───────
-
-      # Generate a SPDX SBOM from the published image. Earlier
-      # iterations of this workflow tried to extract the SBOM that
-      # ``docker/build-push-action`` attaches to the OCI image
-      # manifest (via ``sbom: true``), but ``docker buildx imagetools
-      # inspect``'s ``--format`` template syntax for SBOM access is
-      # unstable across buildx versions. ``anchore/sbom-action`` runs
-      # Syft against the image and produces a clean SPDX file —
-      # purpose-built for this and stable across buildx changes.
-      #
-      # The OCI-attached SBOM (from ``sbom: true`` on the build-push
-      # step) is still present in the image manifest; this step
-      # just produces a *separate* convenience file for the GitHub
-      # release page that doesn't require operators to query the
-      # registry.
-      - name: Generate SPDX SBOM from image
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
-        with:
-          image: ${{ steps.image-ref.outputs.ghcr_full_ref }}
-          format: spdx-json
-          output-file: validibot-validator-backend-${{ matrix.validator }}.spdx.json
-          upload-artifact: false  # Our own upload-artifact step below handles this.
-
-      - name: Upload SBOM as workflow artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: sbom-${{ matrix.validator }}
-          path: validibot-validator-backend-${{ matrix.validator }}.spdx.json
-          retention-days: 90
-
-      - name: Attach SBOM to GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-          VALIDATOR: ${{ matrix.validator }}
-        run: |
           gh release upload "$RELEASE_TAG" \
-            "validibot-validator-backend-${VALIDATOR}.spdx.json" \
+            "$SBOM" \
+            "$APPLICATION_SBOM" \
+            "$RELEASE_RECORD" \
+            "${RELEASE_RECORD}.sha256" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber

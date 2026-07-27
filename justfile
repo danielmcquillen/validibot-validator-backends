@@ -88,8 +88,20 @@ format:
 typecheck:
     uv run mypy .
 
-# Run all checks (lint + test)
-check: lint test
+# Regenerate hash-locked image requirements and application SBOMs
+artifacts:
+    uv run python scripts/backend_artifacts.py generate
+
+# Verify generated image requirements and application SBOMs are current
+artifacts-check:
+    uv run python scripts/backend_artifacts.py check
+
+# Reject unknown or unapproved licenses in the installed development environment
+licenses:
+    uv run --all-extras python scripts/generate_legal_artifacts.py --policy legal/license-policy.toml --check-only
+
+# Run all checks used before a backend release
+check: lint artifacts-check licenses test
 
 # =============================================================================
 # Docker Build
@@ -113,17 +125,15 @@ build validator:
         build_platform="linux/amd64"
     fi
     echo "Building {{validator}} container${build_platform:+ for ${build_platform}}..."
-    # The backend image version comes from the Dockerfile's
-    # ``ARG VALIDATOR_BACKEND_VERSION`` default — that's the single source of
-    # truth. Release engineering can override via the env var
-    # (``VALIDATOR_BACKEND_VERSION=0.1.1-rc1 just build energyplus``); the
-    # ``${VAR:+--build-arg ...}`` form passes the build-arg only when the
-    # env var is set and otherwise lets the Dockerfile default win.
+    uv run python scripts/backend_artifacts.py check --backend "{{validator}}"
+    BACKEND_VERSION="$(
+        python3 scripts/backend_inventory.py field "{{validator}}" release_version
+    )"
     docker buildx build \
         ${build_platform:+--platform "${build_platform}"} \
         --load \
         -f validator_backends/{{validator}}/Dockerfile \
-        ${VALIDATOR_BACKEND_VERSION:+--build-arg VALIDATOR_BACKEND_VERSION="${VALIDATOR_BACKEND_VERSION}"} \
+        --build-arg VALIDATOR_BACKEND_VERSION="$BACKEND_VERSION" \
         --build-arg VALIDATOR_BACKEND_REVISION="{{git_sha}}" \
         --build-arg VALIDATOR_BACKEND_SLUG="{{validator}}" \
         -t validibot-validator-backend-${IMAGE_SLUG}:latest \
@@ -164,14 +174,15 @@ build-push validator:
         exit 1
     fi
     echo "Building and pushing {{validator}} container..."
-    # See ``build`` recipe for the version-handling rationale: Dockerfile
-    # default is canonical; env-var override is opt-in for release
-    # engineering.
+    uv run python scripts/backend_artifacts.py check --backend "{{validator}}"
+    BACKEND_VERSION="$(
+        python3 scripts/backend_inventory.py field "{{validator}}" release_version
+    )"
     docker buildx build \
         --platform linux/amd64 \
         --push \
         -f validator_backends/{{validator}}/Dockerfile \
-        ${VALIDATOR_BACKEND_VERSION:+--build-arg VALIDATOR_BACKEND_VERSION="${VALIDATOR_BACKEND_VERSION}"} \
+        --build-arg VALIDATOR_BACKEND_VERSION="$BACKEND_VERSION" \
         --build-arg VALIDATOR_BACKEND_REVISION="{{git_sha}}" \
         --build-arg VALIDATOR_BACKEND_SLUG="{{validator}}" \
         -t {{ar_repo}}/validibot-validator-backend-${IMAGE_SLUG}:latest \
@@ -385,24 +396,20 @@ verify-all:
 # Release
 # =============================================================================
 #
-# Cuts a signed-tag release. CI then verifies the signature, builds
-# each backend image with full supply-chain provenance (sigstore
-# attestation + SBOM), pushes to GHCR, and (when configured) mirrors
-# to GAR.
+# Cuts one backend-specific signed tag. CI builds only that backend image with
+# full supply-chain provenance, a release JSON record, and an SBOM.
 #
 # Operator verification (after pull): see RELEASING.md.
 
-# Release a new version: signs the tag, pushes, CI builds + publishes.
-# Usage: just release 0.6.0
-release VERSION:
+# Sign and push the version already recorded for one backend in backends.toml.
+# Usage: just release energyplus
+release BACKEND:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Validate version format.
-    if [[ ! "{{VERSION}}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "✗ Version must be in format X.Y.Z (e.g., 0.6.0). Got: {{VERSION}}"
-        exit 1
-    fi
+    VERSION="$(python3 scripts/backend_inventory.py field "{{BACKEND}}" release_version)"
+    TAG="{{BACKEND}}-v${VERSION}"
+    python3 scripts/backend_inventory.py release "$TAG" >/dev/null
 
     # Refuse if working tree is dirty.
     if [[ -n $(git status --porcelain) ]]; then
@@ -420,7 +427,6 @@ release VERSION:
     fi
 
     # Refuse if tag already exists locally or remotely.
-    TAG="v{{VERSION}}"
     if git rev-parse "$TAG" >/dev/null 2>&1; then
         echo "✗ Tag $TAG already exists locally."
         exit 1
@@ -435,14 +441,6 @@ release VERSION:
     if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
         echo "✗ Local main is not in sync with origin/main."
         echo "  Run: git pull"
-        exit 1
-    fi
-
-    # Verify pyproject.toml version matches the requested release.
-    TOML_VERSION=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-    if [[ "$TOML_VERSION" != "{{VERSION}}" ]]; then
-        echo "✗ pyproject.toml version ($TOML_VERSION) doesn't match {{VERSION}}."
-        echo "  Bump the version in pyproject.toml first, commit, and push."
         exit 1
     fi
 
@@ -471,9 +469,9 @@ release VERSION:
                 echo "  Update pyproject.toml so the line reads:"
                 echo "      \"validibot-shared==$SHARED_LATEST\","
                 echo ""
-                echo "  Then commit + push, and re-run: just release {{VERSION}}"
+                echo "  Then commit + push, and re-run: just release {{BACKEND}}"
                 echo ""
-                echo "  Override (emergencies only): VALIDIBOT_RELEASE_ALLOW_STALE_SHARED=1 just release {{VERSION}}"
+                echo "  Override (emergencies only): VALIDIBOT_RELEASE_ALLOW_STALE_SHARED=1 just release {{BACKEND}}"
                 exit 1
             else
                 echo "✓ validibot-shared is at latest ($SHARED_LATEST)"
@@ -481,9 +479,14 @@ release VERSION:
         fi
     fi
 
+    uv run python scripts/backend_artifacts.py check --backend "{{BACKEND}}"
+    uv run --all-extras python scripts/generate_legal_artifacts.py \
+        --policy legal/license-policy.toml \
+        --check-only
+
     echo ""
     echo "About to sign and push tag $TAG."
-    echo "CI will then build + push images for: {{validators}}"
+    echo "CI will build only {{BACKEND}} at version $VERSION."
     echo "Press Enter to continue, Ctrl+C to abort..."
     read -r
 
@@ -498,8 +501,8 @@ release VERSION:
     echo "✓ Pushed $TAG"
     echo "  CI will:"
     echo "    1. Verify the tag signature"
-    echo "    2. Build each backend image (in parallel)"
+    echo "    2. Test and build only {{BACKEND}}"
     echo "    3. Push to GHCR with sigstore attestation"
-    echo "    4. (Optional) Mirror to GAR if GCP_PROJECT_ID is configured"
-    echo "    5. Attach SBOM to GitHub release"
+    echo "    4. Generate and attest the backend release JSON"
+    echo "    5. Attach the release JSON and SBOM to GitHub Releases"
     echo "  Monitor: gh run watch"

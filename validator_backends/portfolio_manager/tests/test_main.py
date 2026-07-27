@@ -73,7 +73,6 @@ def test_main_uploads_property_results_as_declared_output_artifact(
     captured = {}
     outputs = PortfolioManagerOutputs(
         submission_structure="single_report",
-        profile="generic",
         file_count=1,
         valid_file_count=1,
         invalid_file_count=0,

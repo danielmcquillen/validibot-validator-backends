@@ -16,11 +16,11 @@
 # it with the vendored SchXslt2 transpiler (schxslt2/) before running it
 # (D4b).
 
-FROM python:3.13-slim
+FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5e925c2d0e1a91
 
-# Backend wrapper version — bump when wrapper code / image layout / output
-# semantics change. Decoupled from the Saxon pin in requirements.txt.
-ARG VALIDATOR_BACKEND_VERSION="0.15.1"
+# Backend wrapper version — decoupled from the Saxon pin in requirements.txt.
+# Every build reads the value from backends.toml.
+ARG VALIDATOR_BACKEND_VERSION
 ARG VALIDATOR_BACKEND_REVISION="unknown"
 ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="schematron"
@@ -38,35 +38,53 @@ WORKDIR /app
 ENV PYTHONPATH=/app
 
 # Copy requirements first (for layer caching).
-COPY validator_backends/schematron/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY validator_backends/schematron/requirements.lock /tmp/requirements.lock
+RUN python -m pip install --no-cache-dir --require-hashes --no-deps \
+        -r /tmp/requirements.lock \
+    && rm /tmp/requirements.lock
 
-# License compliance (ADR-2026-07-01 D4): SaxonC-HE is MPL-2.0; distributing
-# it in this (AGPL-aggregate) image requires retaining Saxonica's LICENSE /
-# NOTICES. pip already keeps them in the wheel's dist-info; this step copies
-# them to a discoverable top-level path so image scanners and humans find
-# them without spelunking site-packages.
-RUN mkdir -p /app/THIRD_PARTY_NOTICES/saxonche \
-    && cp -r /usr/local/lib/python3.13/site-packages/saxonche-*.dist-info/licenses/. \
-        /app/THIRD_PARTY_NOTICES/saxonche/ 2>/dev/null \
-    || cp /usr/local/lib/python3.13/site-packages/saxonche-*.dist-info/LICENSE* \
-        /app/THIRD_PARTY_NOTICES/saxonche/ 2>/dev/null \
-    || echo "WARNING: saxonche license files not found in dist-info" \
-        > /app/THIRD_PARTY_NOTICES/saxonche/MISSING.txt
+# SaxonC-HE's wheel does not currently publish a license file in dist-info, so
+# keep an explicit MPL/source notice alongside the generated package report.
+RUN mkdir -p /app/legal/components
+COPY LICENSE NOTICE /app/legal/
+COPY legal/SAXONC-HE-NOTICE.md /app/legal/components/SAXONC-HE-NOTICE.md
+COPY validator_backends/schematron/legal/APPLICATION-SBOM.cdx.json \
+    /app/legal/APPLICATION-SBOM.cdx.json
+COPY legal/license-policy.toml /tmp/license-policy.toml
+COPY scripts/generate_legal_artifacts.py /tmp/generate_legal_artifacts.py
+RUN python /tmp/generate_legal_artifacts.py \
+        --policy /tmp/license-policy.toml \
+        --output-dir /app/legal \
+        --component-name "validibot-validator-backend-schematron" \
+        --component-version "${VALIDATOR_BACKEND_VERSION}" \
+    && rm /tmp/license-policy.toml /tmp/generate_legal_artifacts.py
 
 # Non-root user for container execution (Cloud Run + the Docker runner launch
 # with user=1000:1000 and read_only=True).
 RUN groupadd --gid 1000 validibot \
     && useradd --uid 1000 --gid 1000 --no-create-home validibot
 
-# Copy the entire validator_backends package (includes core, schematron, __init__.py).
-COPY --chown=validibot:validibot validator_backends /app/validator_backends
+# Copy only the package marker, shared runtime, and this backend. The root
+# .dockerignore excludes tests and caches inside these directories. Keeping
+# unrelated backends out of the image prevents their fixtures and optional
+# runtime material from becoming part of this release artifact.
+RUN mkdir -p /app/validator_backends/core \
+        /app/validator_backends/schematron/schxslt2 \
+    && chown -R validibot:validibot /app/validator_backends
+COPY --chown=validibot:validibot validator_backends/__init__.py \
+    /app/validator_backends/__init__.py
+COPY --chown=validibot:validibot validator_backends/core/*.py \
+    /app/validator_backends/core/
+COPY --chown=validibot:validibot validator_backends/schematron/*.py \
+    /app/validator_backends/schematron/
+COPY --chown=validibot:validibot validator_backends/schematron/schxslt2 \
+    /app/validator_backends/schematron/schxslt2
 
 # SchXslt2 (MIT, vendored at validator_backends/schematron/schxslt2/) —
-# copy its LICENSE beside the Saxon notices for the same discoverability.
-RUN mkdir -p /app/THIRD_PARTY_NOTICES/schxslt2 \
+# copy its LICENSE beside the other legal artifacts for discoverability.
+RUN mkdir -p /app/legal/components/schxslt2 \
     && cp /app/validator_backends/schematron/schxslt2/LICENSE \
-        /app/THIRD_PARTY_NOTICES/schxslt2/LICENSE
+        /app/legal/components/schxslt2/LICENSE
 
 # Build-time guard: an image without the vendored SchXslt2 transpiler
 # (schxslt2/transpile.xsl — see its README) cannot compile any Schematron,

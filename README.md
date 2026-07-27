@@ -57,7 +57,13 @@ The core Validibot platform triggers these backends, passes input via the standa
 | **FMU** | Validates and executes Functional Mock-up Units | FMU structure validation, variable discovery, bounded simulation testing |
 | **SHACL** | Validates RDF graphs in an isolated container | RDF parsing, SHACL shapes, SHACL-AF/SPARQL isolation, semantic model checks |
 | **Schematron** | Validates XML documents against Schematron rules | Peppol/EN 16931-style business rules, SVRL findings, XSLT isolation |
-| **Portfolio Manager** | Validates ENERGY STAR Portfolio Manager property reports | XLS/XLSX/XML normalization, safe ZIP collections, EBL reconciliation, EUIt and Washington Form C facts |
+| **Building benchmark reports** | Validates exports from ENERGY STAR® Portfolio Manager® | XLS/XLSX/XML normalization, safe ZIP collections, EBL reconciliation, EUIt and Washington Form C facts |
+
+ENERGY STAR and the ENERGY STAR mark are registered trademarks owned by the
+U.S. Environmental Protection Agency. The name ENERGY STAR Portfolio Manager
+and the Portfolio Manager logo are registered trademarks owned by the U.S.
+Environmental Protection Agency. Validibot is independent and is not approved,
+certified, or endorsed by the EPA or the ENERGY STAR program.
 
 ## How It Works
 
@@ -134,7 +140,7 @@ Current backend ports:
 | FMU | `fmu_model 1..1` rendered as `input_files[role=fmu]` | Source may be a library FMU model or a step-owned workflow resource. |
 | SHACL | `data_graph 1..1` rendered as an RDF input file; shapes and ontology currently travel inline in typed `inputs` | Future large/reusable shapes or ontologies should become declared resource/artifact ports. |
 | Schematron | `xml_document 1..1` rendered as an XML input file; Schematron rules currently travel inline in typed `inputs` | Future generated or reusable `.sch` files should become declared resource/artifact ports. |
-| Portfolio Manager | `portfolio_manager_report 1..1` accepts one XLS/XLSX/XML report or ZIP collection; optional `expected_buildings_list 0..1` is a workflow resource | Emits the bounded scalar catalog plus the `portfolio-manager-property-results` JSON artifact. |
+| Building benchmark reports | `portfolio_manager_report 1..1` accepts one XLS/XLSX/XML report or ZIP collection; optional `expected_buildings_list 0..1` is a workflow resource | Emits the bounded scalar catalog plus the `portfolio-manager-property-results` JSON artifact. |
 
 Backend code should read files by role, and by future optional `port_key` when
 available. Do not add new backends that depend on `input_files[0]` without also
@@ -179,13 +185,16 @@ just --list
 
 ### Image version metadata
 
-Each backend's Dockerfile is the **single source of truth** for that
-backend's version. The `ARG VALIDATOR_BACKEND_VERSION` default is what gets
-stamped onto the built image as the `org.opencontainers.image.version` OCI
-label — and that's the only place the version lives. Specifically:
+Each backend's `release_version` in [`backends.toml`](backends.toml) is the
+**single source of truth** for the version offered to a new installation or
+routine update. Local build recipes and the release workflow read that exact
+value and pass it as `VALIDATOR_BACKEND_VERSION`; the Dockerfiles have no
+version default.
 
 - **Not in a Python constant.** No `BACKEND_IMAGE_VERSION` in
-  `__metadata__.py` to drift from the Dockerfile.
+  `__metadata__.py` to drift from the inventory.
+- **Not in a Dockerfile default.** The `ARG` is required and receives the
+  inventory value from every supported build path.
 - **Not in a runtime environment variable.** The container doesn't read its
   own version from its environment at startup; the version belongs to the
   image's identity, not the runtime caller's configuration.
@@ -198,20 +207,39 @@ support, and release readability — not for cryptographic verification.
 
 ```dockerfile
 # validator_backends/energyplus/Dockerfile
-ARG VALIDATOR_BACKEND_VERSION="0.12.0"
+ARG VALIDATOR_BACKEND_VERSION
 LABEL org.opencontainers.image.version="${VALIDATOR_BACKEND_VERSION}" ...
 ```
 
 The `just build <validator>` and `just build-push <validator>` recipes
-honour this default and additionally stamp:
+read the matching inventory entry and additionally stamp:
 
 - `org.opencontainers.image.revision` = current git commit SHA
 - `org.opencontainers.image.source` = this repository
 - `io.validibot.validator-backend.slug` = the backend slug
   (`energyplus`, `fmu`, …)
 
-Each backend has its own version. EnergyPlus can move to `0.1.1` while FMU
-stays on `0.1.0` — they're independent files.
+Each backend has its own version. EnergyPlus can move to `0.17.0` while FMU
+stays on `0.15.1`; changing one inventory entry does not release the others.
+
+### Reproducible dependencies and legal evidence
+
+Each inventory record points to a human-authored `requirements.txt`, a
+generated hash-locked `requirements.lock`, and a generated CycloneDX
+application SBOM. The direct pins must match the root project plus the
+backend's optional dependency group. Regenerate and verify them with:
+
+```bash
+uv run python scripts/backend_artifacts.py generate
+uv run python scripts/backend_artifacts.py check
+```
+
+Images install only from the generated lock. Every image contains `/app/legal`
+with Validibot's `LICENSE` and `NOTICE`, the application SBOM, a generated
+report of the Python distributions actually installed, and copied
+wheel-provided license files. Release CI also publishes an image-level SPDX
+SBOM that includes the base operating system. License-policy checks fail closed
+on new, unknown, or unapproved dependency licenses.
 
 #### Wrapper version vs bundled-library version (CRUCIAL)
 
@@ -219,11 +247,12 @@ stays on `0.1.0` — they're independent files.
 container image, the entrypoint, the envelope handling. It is *intentionally
 decoupled* from the upstream library version that the wrapper bundles.
 
-Concretely, a fresh `validator_backends/energyplus/Dockerfile` ships with:
+For example, the EnergyPlus inventory entry and Dockerfile describe separate
+version axes:
 
 | Axis | Value | Bumped when |
 |---|---|---|
-| Wrapper version (`VALIDATOR_BACKEND_VERSION`) | `0.12.0` | Wrapper code, image layout, or output semantics change |
+| Wrapper version (`backends.toml` `release_version`) | `0.15.1` | Wrapper code, image layout, or output semantics change |
 | Bundled EnergyPlus binary | `25.2.0` | A newer EnergyPlus release is downloaded |
 
 These are independent:
@@ -243,45 +272,35 @@ library version. Bumping the bundled library does NOT imply bumping
 ```bash
 docker image inspect validibot-validator-backend-energyplus:latest \
   --format '{{ index .Config.Labels "org.opencontainers.image.version" }}'
-# → 0.12.0
+# → 0.15.1
 
 docker image inspect validibot-validator-backend-energyplus:latest \
   --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
 # → abc1234
 ```
 
-#### Override for release engineering
+#### Manual builds
 
-Release engineering can override the Dockerfile default at build time
-without editing source — useful for RC builds and one-off provenance:
+Manual Docker builds must read or pass the exact inventory version. The
+supported `just build` command does that automatically:
 
 ```bash
-# Manual build using the Dockerfile default (0.1.0):
+just build energyplus
+
+# Equivalent direct build:
+VERSION="$(python3 scripts/backend_inventory.py field energyplus release_version)"
 docker buildx build \
   --platform linux/amd64 --load \
   -f validator_backends/energyplus/Dockerfile \
+  --build-arg VALIDATOR_BACKEND_VERSION="$VERSION" \
   --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
   --build-arg VALIDATOR_BACKEND_SLUG=energyplus \
-  -t validibot-validator-backend-energyplus:0.1.0 \
-  .
-
-# Same build but stamping a release-candidate version:
-VALIDATOR_BACKEND_VERSION=0.1.1-rc1 just build energyplus
-
-# Or directly:
-docker buildx build \
-  --platform linux/amd64 --load \
-  -f validator_backends/energyplus/Dockerfile \
-  --build-arg VALIDATOR_BACKEND_VERSION=0.1.1-rc1 \
-  --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
-  --build-arg VALIDATOR_BACKEND_SLUG=energyplus \
-  -t validibot-validator-backend-energyplus:0.1.1-rc1 \
+  -t "validibot-validator-backend-energyplus:v$VERSION" \
   .
 ```
 
-The `${VAR:+--build-arg ...}` form in the just recipes only passes the
-build-arg when `VALIDATOR_BACKEND_VERSION` is set in the environment;
-otherwise the Dockerfile default wins.
+The supported just recipes always pass the version read from
+`backends.toml`; they do not accept an environment override.
 
 > [!IMPORTANT]
 > **After updating dependencies (especially `validibot-shared`):**
@@ -555,10 +574,8 @@ cp -r validator_backends/energyplus validator_backends/myvalidator
 Edit `validator_backends/myvalidator/__metadata__.py`:
 
 ```python
-# Note: the backend image version lives in the Dockerfile's
-# ``ARG VALIDATOR_BACKEND_VERSION`` default — see step 3 below.
-# Don't redeclare it here (no ``BACKEND_IMAGE_VERSION`` constant) —
-# the Dockerfile is the single source of truth.
+# Note: the backend image version lives in this backend's
+# ``backends.toml`` release_version. Don't redeclare it here.
 
 METADATA = {
     "validator_type": "MYVALIDATOR",
@@ -672,21 +689,36 @@ def run_validation(envelope: MyValidatorInputEnvelope) -> MyValidatorOutputEnvel
 
 ### 5. Update Dockerfile
 
-Edit `validator_backends/myvalidator/Dockerfile` to install your dependencies:
+Add the backend to `backends.toml` and the matching optional dependency group
+to `pyproject.toml`, then generate its lock and application SBOM. Edit
+`validator_backends/myvalidator/Dockerfile` to install only from that lock:
 
 ```dockerfile
-FROM python:3.13-slim
+FROM python:3.13-slim@sha256:<reviewed-multi-platform-index-digest>
 
 WORKDIR /app
-ENV PYTHONPATH="/app:${PYTHONPATH}"
+ENV PYTHONPATH=/app
 
 # Install your domain-specific tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     your-tool \
     && rm -rf /var/lib/apt/lists/*
 
-COPY validator_backends/myvalidator/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY validator_backends/myvalidator/requirements.lock /tmp/requirements.lock
+RUN python -m pip install --no-cache-dir --require-hashes --no-deps \
+        -r /tmp/requirements.lock \
+    && rm /tmp/requirements.lock
+
+RUN mkdir -p /app/legal
+COPY LICENSE NOTICE /app/legal/
+COPY validator_backends/myvalidator/legal/APPLICATION-SBOM.cdx.json \
+    /app/legal/APPLICATION-SBOM.cdx.json
+COPY legal/license-policy.toml scripts/generate_legal_artifacts.py /tmp/
+RUN python /tmp/generate_legal_artifacts.py \
+        --policy /tmp/license-policy.toml \
+        --output-dir /app/legal \
+        --component-name validibot-validator-backend-myvalidator \
+        --component-version "${VALIDATOR_BACKEND_VERSION}"
 
 # Create non-root user BEFORE copying code so --chown works.
 # The core platform runs containers with user=1000:1000 and read_only=True,
@@ -694,7 +726,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN groupadd --gid 1000 validibot \
     && useradd --uid 1000 --gid 1000 --no-create-home validibot
 
-COPY --chown=validibot:validibot validator_backends /app/validator_backends
+RUN mkdir -p /app/validator_backends/core /app/validator_backends/myvalidator \
+    && chown -R validibot:validibot /app/validator_backends
+COPY --chown=validibot:validibot validator_backends/__init__.py \
+    /app/validator_backends/__init__.py
+COPY --chown=validibot:validibot validator_backends/core/*.py \
+    /app/validator_backends/core/
+COPY --chown=validibot:validibot validator_backends/myvalidator/*.py \
+    /app/validator_backends/myvalidator/
 
 USER validibot
 

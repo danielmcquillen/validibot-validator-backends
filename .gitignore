@@ -61,6 +61,7 @@ temp/
 *.tmp
 
 # Security — never commit secrets or key material
+*.key
 *.pem
 *.p12
 credentials.json

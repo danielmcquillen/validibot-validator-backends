@@ -1,16 +1,26 @@
 """Tests for the authoritative validator backend inventory.
 
-The supply-chain ADR makes ``backends.toml`` the source of backend membership.
-These tests deliberately compare the manifest with the current handwritten
-release and developer entry points so drift is caught before a release omits a
-supported backend or publishes one with the wrong shared contract.
+Schema 2 makes ``backends.toml`` the only list of release-enabled backends,
+their build inputs, and the version offered to setup/update. These tests prove
+that local builds and the one-backend release workflow consume those values
+instead of keeping handwritten release matrices or Dockerfile defaults.
 """
 
 from __future__ import annotations
 
 import re
 import tomllib
+from copy import deepcopy
 from pathlib import Path
+
+import pytest
+from scripts.backend_inventory import (
+    InventoryError,
+    parse_release_tag,
+    provider_resource_name,
+    release_output,
+    validate_inventory,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -27,16 +37,6 @@ def _backends() -> list[dict]:
     return list(_manifest()["backend"])
 
 
-def _release_slugs() -> list[str]:
-    """Extract the release matrix from the GitHub Actions workflow."""
-    release_yml = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(
-        encoding="utf-8",
-    )
-    match = re.search(r"validator:\s*\[([^\]]+)\]", release_yml)
-    assert match, "release workflow must declare a validator matrix"
-    return [slug.strip() for slug in match.group(1).split(",")]
-
-
 def _justfile_slugs() -> list[str]:
     """Extract the developer/release backend list from the justfile."""
     justfile = (REPO_ROOT / "justfile").read_text(encoding="utf-8")
@@ -48,16 +48,26 @@ def _justfile_slugs() -> list[str]:
 def test_manifest_schema_and_paths_are_valid():
     """Every manifest entry must point at the files release tooling needs."""
     manifest = _manifest()
-    assert manifest["schema_version"] == 1
+    validated = validate_inventory(manifest)
 
-    slugs = [backend["slug"] for backend in _backends()]
+    assert manifest["schema_version"] == 2
+    slugs = [backend.slug for backend in validated]
     assert len(slugs) == len(set(slugs))
 
     for backend in _backends():
         slug = backend["slug"]
         assert (REPO_ROOT / "validator_backends" / slug).is_dir()
-        for key in ("dockerfile", "requirements", "test_path", "version_source"):
+        for key in (
+            "dockerfile",
+            "requirements",
+            "requirements_lock",
+            "application_sbom",
+            "test_path",
+        ):
             assert (REPO_ROOT / backend[key]).exists(), f"{slug}.{key} is missing"
+        assert "version_source" not in backend
+        assert backend["release_version"]
+        assert backend["provider_resource_slug"]
         image_slug = slug.replace("_", "-")
         assert backend["image_name"] == f"validibot-validator-backend-{image_slug}"
         assert backend["platforms"] == ["linux/amd64"]
@@ -67,12 +77,46 @@ def test_manifest_schema_and_paths_are_valid():
         assert backend["service_max_domain_seconds"] == 1500
 
 
-def test_manifest_matches_release_and_developer_matrices():
-    """Release and justfile membership must stay in sync with the manifest."""
+def test_release_and_developer_builds_are_inventory_driven():
+    """Every release-enabled entry must be supported without a second list."""
     release_slugs = [backend["slug"] for backend in _backends() if backend.get("release") is True]
+    release_yml = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    justfile = (REPO_ROOT / "Justfile").read_text(encoding="utf-8")
 
-    assert _release_slugs() == release_slugs
     assert _justfile_slugs() == release_slugs
+    assert "matrix:" not in release_yml
+    assert "scripts/backend_inventory.py release" in release_yml
+    assert "needs.select-release.outputs.backend" in release_yml
+    assert "VALIDATOR_BACKEND_VERSION=${{" in release_yml
+    assert 'scripts/backend_inventory.py field "{{validator}}" release_version' in justfile
+    assert '--build-arg VALIDATOR_BACKEND_VERSION="$BACKEND_VERSION"' in justfile
+
+
+def test_release_json_contains_only_the_public_adr_fields():
+    """Application SBOMs may be attached separately but not alter release JSON."""
+    release_yml = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    record_expression = release_yml.split(
+        "--arg schema_version",
+        maxsplit=1,
+    )[1].split(
+        '}\' > "$RELEASE_RECORD"',
+        maxsplit=1,
+    )[0]
+
+    for field in (
+        "schema_version:",
+        "backend:",
+        "version:",
+        "source_tag:",
+        "source_commit:",
+        "image:",
+        "image_digest:",
+        "shared_contract:",
+        "sbom:",
+        "build_verification:",
+    ):
+        assert field in record_expression
+    assert "application_sbom:" not in record_expression
 
 
 def test_shared_contract_matches_backend_requirements():
@@ -85,6 +129,54 @@ def test_shared_contract_matches_backend_requirements():
         assert expected_pin in requirements
 
 
+def test_backend_specific_tags_select_only_the_named_inventory_entry():
+    """A tag cannot release every backend or disagree with the offered version."""
+    for raw_backend in _backends():
+        backend = parse_release_tag(f"{raw_backend['slug']}-v{raw_backend['release_version']}")
+        output = release_output(
+            backend,
+            tag=f"{backend.slug}-v{backend.release_version}",
+        )
+
+        assert backend.slug == raw_backend["slug"]
+        assert output["test_path"] == raw_backend["test_path"]
+        assert output["requirements_lock"] == raw_backend["requirements_lock"]
+        assert output["application_sbom"] == raw_backend["application_sbom"]
+        assert output["release_record"].endswith(f"-v{raw_backend['release_version']}.json")
+
+    with pytest.raises(InventoryError, match=r"backends\.toml offers"):
+        parse_release_tag("energyplus-v99.0.0")
+    with pytest.raises(InventoryError, match="release tag must"):
+        parse_release_tag("v0.16.0")
+
+
+def test_provider_resource_names_are_unique_bounded_and_release_specific():
+    """Every inventory entry must yield safe Service and Job names."""
+    validated = validate_inventory(_manifest())
+    names = {
+        provider_resource_name(kind=kind, backend=backend, stage=stage)
+        for backend in validated
+        for kind in ("service", "job")
+        for stage in ("staging", "prod")
+    }
+
+    assert len(names) == len(validated) * 2 * 2
+    assert all(len(name) <= 63 for name in names)
+    assert "vb-vs-energyplus-v0-15-1" in names
+    assert "vb-vj-portfolio-manager-v0-16-1-stg" in names
+
+
+def test_duplicate_provider_slug_is_rejected():
+    """Two backends must never resolve to the same Cloud Run resource prefix."""
+    manifest = deepcopy(_manifest())
+    manifest["backend"][1]["provider_resource_slug"] = manifest["backend"][0][
+        "provider_resource_slug"
+    ]
+
+    with pytest.raises(InventoryError, match="duplicate provider_resource_slug"):
+        validate_inventory(manifest)
+
+
 def test_every_release_image_routes_job_and_service_through_shared_entrypoint():
     """A backend cannot silently bypass the common isolation/HTTP contract."""
     for backend in _backends():
@@ -92,6 +184,36 @@ def test_every_release_image_routes_job_and_service_through_shared_entrypoint():
         expected_module = f"validator_backends.{backend['slug']}.main"
         assert "validator_backends.core.entrypoint" in dockerfile
         assert f'"--backend-module", "{expected_module}"' in dockerfile
+
+
+def test_every_release_image_copies_only_core_and_its_own_backend():
+    """Unrelated backend code and test fixtures must not enter an image.
+
+    The repository root is the shared Docker build context, so a broad package
+    copy would make every validator image contain every backend. Each
+    Dockerfile must instead copy the package marker, the shared runtime, and
+    exactly its selected backend; ``.dockerignore`` removes tests and caches
+    below those explicitly selected directories.
+    """
+    backend_slugs = {backend["slug"] for backend in _backends()}
+    broad_copy = "validator_backends /app/validator_backends"
+
+    for backend in _backends():
+        slug = backend["slug"]
+        dockerfile = (REPO_ROOT / backend["dockerfile"]).read_text(encoding="utf-8")
+        normalized = re.sub(
+            r"[ \t]+",
+            " ",
+            re.sub(r"\\[ \t]*\n[ \t]*", " ", dockerfile),
+        )
+
+        assert broad_copy not in normalized
+        assert ("validator_backends/__init__.py /app/validator_backends/__init__.py") in normalized
+        assert ("validator_backends/core/*.py /app/validator_backends/core/") in normalized
+        assert (f"validator_backends/{slug}/*.py /app/validator_backends/{slug}/") in normalized
+
+        for unrelated_slug in backend_slugs - {slug}:
+            assert f"validator_backends/{unrelated_slug} " not in normalized
 
 
 def test_dockerignore_excludes_local_build_noise_and_secrets():
@@ -112,5 +234,7 @@ def test_dockerignore_excludes_local_build_noise_and_secrets():
         "*.key",
         "dist",
         "build",
+        "**/__pycache__",
+        "validator_backends/*/tests",
     }:
         assert required in ignored

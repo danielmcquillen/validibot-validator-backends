@@ -232,13 +232,14 @@ def _read_zip_collection(
             if _is_ignorable_archive_metadata(path):
                 continue
             file_count += 1
+            member_type = stat.S_IFMT(member.external_attr >> 16)
             unsafe = (
                 path.is_absolute()
                 or ".." in path.parts
                 or len(path.parts) != 1
                 or "\\" in member_name
                 or "\x00" in member_name
-                or stat.S_ISLNK(member.external_attr >> 16)
+                or member_type not in {0, stat.S_IFREG}
             )
             normalized_name = member_name.casefold()
             if normalized_name in seen_names:
@@ -357,8 +358,7 @@ def _load_ebl(
     candidates = [
         item
         for item in input_envelope.resource_files
-        if item.port_key == "expected_buildings_list"
-        or item.type == "portfolio_manager_ebl_v1"
+        if item.port_key == "expected_buildings_list" or item.type == "portfolio_manager_ebl_v1"
     ]
     if not candidates:
         return None
@@ -390,7 +390,7 @@ def _apply_checks_and_targets(
     ebl: ExpectedBuildingsList | None,
     collector: _FindingCollector,
 ) -> None:
-    """Apply profile requirements and resolve each property's target facts."""
+    """Apply explicit workflow requirements and resolve each property's targets."""
     ebl_by_id = {building.id_value: building for building in ebl.buildings} if ebl else {}
     for record in records:
         identity = _identity_for_record(record, ebl) if ebl else ""
@@ -411,16 +411,11 @@ def _apply_checks_and_targets(
             actual = record.weather_normalized_site_eui_kbtu_ft2_yr
             record.euit_margin_kbtu_ft2_yr = target - actual
             record.euit_ratio = actual / target
-            record.euit_percent_difference = (
-                (target - actual) / target
-            ) * _ONE_HUNDRED
+            record.euit_percent_difference = ((target - actual) / target) * _ONE_HUNDRED
             record.meets_euit = actual <= target
             record.near_euit = (
                 not record.meets_euit
-                and actual
-                <= target
-                * (_ONE_HUNDRED + inputs.near_target_percent)
-                / _ONE_HUNDRED
+                and actual <= target * (_ONE_HUNDRED + inputs.near_target_percent) / _ONE_HUNDRED
             )
 
         record.reporting_period_complete = _period_is_complete(
@@ -502,10 +497,7 @@ def _required_check_findings(
                 path=metric,
                 **kwargs,
             )
-    if (
-        inputs.require_complete_reporting_period
-        and record.reporting_period_complete is not True
-    ):
+    if inputs.require_complete_reporting_period and record.reporting_period_complete is not True:
         collector.add(
             "ERROR",
             "portfolio_manager.reporting_period.incomplete",
@@ -563,10 +555,7 @@ def _required_check_findings(
         collector.add(
             "ERROR",
             "portfolio_manager.identity.washington_standard_id_missing",
-            (
-                "The report does not include the State of Washington Clean "
-                "Buildings Standard ID."
-            ),
+            ("The report does not include the State of Washington Clean Buildings Standard ID."),
             **kwargs,
         )
     _alert_policy_findings(record, inputs=inputs, collector=collector)
@@ -673,17 +662,19 @@ def _alert_policy_findings(
 def _alert_category(heading: str) -> str | None:
     """Map current EPA alert labels to stable configured check identities."""
     normalized = re.sub(r"[^a-z0-9]+", "", heading.casefold())
-    if "lessthan12fullcalendarmonths" in normalized:
+    if "month" in normalized and ("lessthan12" in normalized or "lessthantwelve" in normalized):
         return "meter_less_than_12_months"
     if "gap" in normalized:
         return "meter_gap"
     if "overlap" in normalized:
         return "meter_overlap"
-    if "nomet" in normalized and "selected" in normalized:
+    if ("nomet" in normalized and "selected" in normalized) or "meternoassociation" in normalized:
         return "no_meters_selected"
     if "65days" in normalized or "morethan65days" in normalized:
         return "long_meter_entry"
-    if "estimated" in normalized and "energy" in normalized:
+    if "estimated" in normalized and any(
+        token in normalized for token in ("energy", "electricity", "naturalgas")
+    ):
         return "estimated_energy"
     return None
 
@@ -777,13 +768,9 @@ def _build_outputs(
         allow_partial=True,
     )
     target_covered = [record for record in records if record.resolved_euit_kbtu_ft2_yr is not None]
-    target_comparable = [
-        record for record in target_covered if record.meets_euit is not None
-    ]
+    target_comparable = [record for record in target_covered if record.meets_euit is not None]
     target_met = [record for record in target_comparable if record.meets_euit is True]
-    target_above = [
-        record for record in target_comparable if record.meets_euit is False
-    ]
+    target_above = [record for record in target_comparable if record.meets_euit is False]
     target_near = [record for record in target_above if record.near_euit is True]
     excess = None
     if aggregate_available:
@@ -810,7 +797,6 @@ def _build_outputs(
 
     return PortfolioManagerOutputs(
         submission_structure=inputs.submission_structure,
-        profile=inputs.profile,
         file_count=file_count,
         valid_file_count=max(0, file_count - invalid_file_count),
         invalid_file_count=invalid_file_count,
@@ -894,11 +880,7 @@ def _weighted_metric(
         return None
     pairs = [(getattr(record, field), record.gross_floor_area_ft2) for record in records]
     if allow_partial:
-        pairs = [
-            (value, area)
-            for value, area in pairs
-            if value is not None and area is not None
-        ]
+        pairs = [(value, area) for value, area in pairs if value is not None and area is not None]
         if not pairs:
             return None
     if any(value is None or area is None for value, area in pairs):
@@ -935,11 +917,7 @@ def _floor_area_compliance_percent(
     if denominator <= 0:
         return None
     numerator = sum(
-        (
-            record.gross_floor_area_ft2
-            for record in records
-            if record.meets_euit is True
-        ),
+        (record.gross_floor_area_ft2 for record in records if record.meets_euit is True),
         Decimal(),
     )
     return numerator / denominator * _ONE_HUNDRED
@@ -1006,7 +984,6 @@ def property_results_artifact_json(outputs: PortfolioManagerOutputs) -> str:
     payload = {
         "schema_version": "validibot.portfolio_manager.property_results.v1",
         "submission_structure": outputs.submission_structure,
-        "profile": outputs.profile,
         "summary": outputs.model_dump(
             mode="json",
             exclude={
@@ -1027,8 +1004,7 @@ def property_results_artifact_json(outputs: PortfolioManagerOutputs) -> str:
             "duplicate_submitted_property_ids": (outputs.duplicate_submitted_property_ids),
         },
         "findings": [
-            finding.model_dump(mode="json", exclude_none=False)
-            for finding in outputs.findings
+            finding.model_dump(mode="json", exclude_none=False) for finding in outputs.findings
         ],
     }
     return json.dumps(payload, indent=2, sort_keys=True)

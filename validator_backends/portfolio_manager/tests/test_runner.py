@@ -12,8 +12,9 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import stat
 import zipfile
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from openpyxl import Workbook
 
@@ -34,8 +35,7 @@ from validibot_shared.validations.envelopes import (
 )
 
 
-if TYPE_CHECKING:
-    from pathlib import Path
+ASSETS = Path(__file__).with_name("assets")
 
 
 def _xlsx_bytes(
@@ -238,6 +238,31 @@ def test_zip_processes_valid_members_even_when_an_unsafe_member_fails(
     )
 
 
+def test_zip_rejects_special_files_without_extracting_them(tmp_path: Path) -> None:
+    """Device, socket, and pipe entries are never ordinary report members."""
+    buffer = io.BytesIO()
+    member = zipfile.ZipInfo("named-pipe.xml")
+    member.create_system = 3
+    member.external_attr = stat.S_IFIFO << 16
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(member, b"<property><propertyId>bad</propertyId></property>")
+    envelope = _envelope(
+        tmp_path,
+        submission_name="reports.zip",
+        submission_bytes=buffer.getvalue(),
+        inputs=PortfolioManagerInputs(submission_structure="zip_collection"),
+    )
+
+    result = run_portfolio_manager_validation(envelope)
+
+    assert result.status == ValidationStatus.FAILED_VALIDATION
+    assert result.outputs.property_count == 0
+    assert any(
+        finding.code == "portfolio_manager.archive.unsafe_member"
+        for finding in result.outputs.findings
+    )
+
+
 def test_parent_child_overlap_blocks_aggregates_without_becoming_an_error(
     tmp_path: Path,
 ) -> None:
@@ -379,6 +404,148 @@ def test_hidden_archive_metadata_is_ignored_and_empty_collection_fails(
     assert result.status == ValidationStatus.FAILED_VALIDATION
     assert result.outputs.file_count == 0
     assert any(
-        finding.code == "portfolio_manager.archive.empty"
+        finding.code == "portfolio_manager.archive.empty" for finding in result.outputs.findings
+    )
+
+
+def test_full_property_fixture_runs_in_single_report_mode(tmp_path: Path) -> None:
+    """A valid one-property multi-sheet export is a complete single submission."""
+    report = (ASSETS / "portfolio-manager-full-property-anonymized.xlsx").read_bytes()
+    envelope = _envelope(
+        tmp_path,
+        submission_name="full-property.xlsx",
+        submission_bytes=report,
+        inputs=PortfolioManagerInputs(),
+    )
+
+    result = run_portfolio_manager_validation(envelope)
+
+    assert result.status == ValidationStatus.SUCCESS
+    assert result.outputs.property_count == 1
+    assert result.outputs.invalid_file_count == 0
+    assert result.outputs.property_results[0].property_id == "8200001"
+    assert result.outputs.property_results[0].washington_standard_id == "WA-VB-8200001"
+
+
+def test_zip_collection_accepts_one_property_in_each_real_carrier(
+    tmp_path: Path,
+) -> None:
+    """BIFF, OOXML, and report-result XML members coexist in one collection."""
+    archive = _zip_bytes(
+        {
+            "legacy.xls": (
+                ASSETS / "portfolio-manager-custom-report-single-anonymized.xls"
+            ).read_bytes(),
+            "full-property.xlsx": (
+                ASSETS / "portfolio-manager-full-property-anonymized.xlsx"
+            ).read_bytes(),
+            "report.xml": (
+                ASSETS / "portfolio-manager-custom-report-single-anonymized.xml"
+            ).read_bytes(),
+        }
+    )
+    envelope = _envelope(
+        tmp_path,
+        submission_name="reports.zip",
+        submission_bytes=archive,
+        inputs=PortfolioManagerInputs(submission_structure="zip_collection"),
+    )
+
+    result = run_portfolio_manager_validation(envelope)
+
+    assert result.status == ValidationStatus.SUCCESS
+    assert result.outputs.file_count == 3
+    assert result.outputs.invalid_file_count == 0
+    assert result.outputs.property_count == 3
+    assert {record.carrier for record in result.outputs.property_results} == {
+        "xls",
+        "xlsx",
+        "xml",
+    }
+    assert {record.property_id for record in result.outputs.property_results} == {
+        "7100001",
+        "8200001",
+        "8300001",
+    }
+
+
+def test_multi_property_fixture_is_rejected_only_by_single_mode_policy(
+    tmp_path: Path,
+) -> None:
+    """A parseable report with several properties violates the selected structure."""
+    report = (ASSETS / "portfolio-manager-custom-report-anonymized.xlsx").read_bytes()
+    envelope = _envelope(
+        tmp_path,
+        submission_name="multi-property.xlsx",
+        submission_bytes=report,
+        inputs=PortfolioManagerInputs(),
+    )
+
+    result = run_portfolio_manager_validation(envelope)
+
+    assert result.status == ValidationStatus.FAILED_VALIDATION
+    assert result.outputs.property_count == 0
+    assert result.outputs.invalid_file_count == 1
+    assert any(
+        finding.code == "portfolio_manager.report.invalid"
+        and "exactly one property" in finding.message
+        for finding in result.outputs.findings
+    )
+
+
+def test_invalid_multi_property_member_does_not_hide_valid_fixture_member(
+    tmp_path: Path,
+) -> None:
+    """Collection processing retains valid facts after a member-level shape error."""
+    archive = _zip_bytes(
+        {
+            "multi-property.xls": (
+                ASSETS / "portfolio-manager-custom-report-anonymized.xls"
+            ).read_bytes(),
+            "single-property.xml": (
+                ASSETS / "portfolio-manager-custom-report-single-anonymized.xml"
+            ).read_bytes(),
+        }
+    )
+    envelope = _envelope(
+        tmp_path,
+        submission_name="reports.zip",
+        submission_bytes=archive,
+        inputs=PortfolioManagerInputs(submission_structure="zip_collection"),
+    )
+
+    result = run_portfolio_manager_validation(envelope)
+
+    assert result.status == ValidationStatus.FAILED_VALIDATION
+    assert result.outputs.file_count == 2
+    assert result.outputs.invalid_file_count == 1
+    assert result.outputs.property_count == 1
+    assert result.outputs.property_results[0].property_id == "8300001"
+
+
+def test_real_xml_alert_metrics_satisfy_every_enabled_quality_check(
+    tmp_path: Path,
+) -> None:
+    """Current EPA metric names must make configured checks verifiable."""
+    report = (ASSETS / "portfolio-manager-custom-report-single-anonymized.xml").read_bytes()
+    envelope = _envelope(
+        tmp_path,
+        submission_name="report.xml",
+        submission_bytes=report,
+        inputs=PortfolioManagerInputs(
+            meter_less_than_12_months_policy="warning",
+            meter_gap_policy="warning",
+            meter_overlap_policy="warning",
+            no_meters_selected_policy="warning",
+            long_meter_entry_policy="warning",
+            estimated_energy_policy="warning",
+        ),
+    )
+
+    result = run_portfolio_manager_validation(envelope)
+
+    assert result.status == ValidationStatus.SUCCESS
+    assert not any(
+        finding.code == "portfolio_manager.check_not_verifiable"
         for finding in result.outputs.findings
     )
