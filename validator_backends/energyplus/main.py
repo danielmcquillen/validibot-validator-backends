@@ -269,7 +269,7 @@ def _rewrite_output_paths(
     uri_by_name = {Path(a.name).name: a.uri for a in artifacts}
     sim_outputs = outputs.outputs
 
-    def _map(name: str, current: Path | None) -> Path | None | str:
+    def _map(name: str, current: Path | None) -> Path | str | None:
         if name in uri_by_name:
             return uri_by_name[name]
         return current

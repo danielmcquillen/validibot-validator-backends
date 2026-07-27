@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Backend releases: EnergyPlus/FMU/SHACL/Schematron 0.15.2; Portfolio Manager 0.16.2 - 2026-07-27
+
+### Fixed
+
+- Use git's canonical lowercase `justfile` path in the inventory contract test
+  so releases pass on case-sensitive Linux runners as well as macOS.
+
+### Added
+
+- Publish independent per-backend release identities, signed tags, strict
+  digest-bound release records, application and image SBOMs, and same-image
+  Service/Job runtime metadata.
+- Add fixture provenance, checksums, and privacy/safety tests for the
+  Portfolio Manager V1 compatibility corpus.
+
 ### Changed
 
 - Resolve the root development and CI environment from the published
@@ -15,6 +30,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep sibling-checkout testing explicit and ephemeral rather than committing a
   local path source that release-ready builds must override.
 - Run CI with the committed lockfile frozen.
+- Upgrade all backend images to the published `validibot-shared==0.21.0`
+  explicit-policy and release-evidence contract.
+- Define Portfolio Manager V1 as compatibility with the reviewed public,
+  anonymized SEED-derived XLS, XLSX, XML, and flat ZIP fixtures. Fresh
+  current-EPA export certification is deferred to V2.
+- Correct public and maintainer documentation for independent releases,
+  immutable failed tags, lowercase `justfile`, and the hosted
+  `validator-update` operator flow.
+- Retain the failed `0.15.1` backend tags and failed Portfolio Manager `0.16.1`
+  tag as immutable release-attempt records; publish the corrected attempts as
+  `0.15.2` and `0.16.2`.
+
+### Security
+
+- Reject active content, external relationships, embedded objects, formulas,
+  unsafe XML instructions, oversized structures, and non-regular ZIP members
+  before Portfolio Manager report values are normalized.
 
 ## [0.16.0] - 2026-07-23
 

@@ -17,12 +17,12 @@
 #
 # DEPLOYMENT:
 #   This justfile builds and deploys development Cloud Run Jobs. The main
-#   validibot repository owns complete signed-release deployment to both Jobs
-#   and Services:
+#   hosted operator commands live in the sibling validibot-project repository
+#   and deploy verified signed releases to both Jobs and Services:
 #
 #     From validibot-validator-backends/:  just deploy energyplus dev
-#     From validibot/: just gcp validator-job-deploy energyplus dev
-#     Production:      just gcp validator-deploy-all prod vX.Y.Z
+#     From validibot-project/:             just validator-status
+#     Production update:                  just validator-update energyplus
 #
 # =============================================================================
 
@@ -49,8 +49,8 @@ ar_repo := ar_host + "/" + gcp_project + "/validibot"
 # Git SHA for tagging
 git_sha := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
 
-# Available validators (drives build-all / build-push-all / deploy-all and the
-# release CI matrix — a validator omitted here is silently skipped by those).
+# Available validators for local batch build/push/deploy recipes. Release CI
+# selects exactly one backend from backends.toml and does not use this list.
 validators := "energyplus fmu shacl schematron portfolio_manager"
 
 # =============================================================================
@@ -217,8 +217,8 @@ deploy validator stage:
     fi
     if [ "{{stage}}" = "prod" ]; then
         echo "Error: this repository does not deploy locally built images to production." >&2
-        echo "From the validibot repo, run:" >&2
-        echo "  just gcp validator-deploy-all prod vX.Y.Z" >&2
+        echo "From the validibot-project repo, run:" >&2
+        echo "  just validator-update {{validator}}" >&2
         exit 1
     fi
     just build-push {{validator}}
@@ -398,6 +398,8 @@ verify-all:
 #
 # Cuts one backend-specific signed tag. CI builds only that backend image with
 # full supply-chain provenance, a release JSON record, and an SBOM.
+# Published and failed tags are immutable. If a tagged workflow fails, fix the
+# source, bump only that backend's release_version, and create a new tag.
 #
 # Operator verification (after pull): see RELEASING.md.
 

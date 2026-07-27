@@ -2,9 +2,9 @@
 pydantic==2.13.4
 httpx==0.28.1
 google-cloud-storage==3.13.0
-google-auth==2.56.0
+google-auth==2.56.2
 requests==2.34.2
-sentry-sdk==2.66.0
+sentry-sdk==2.66.1
 
 # Hardened-XML guard (defence in depth; Django pre-guards before dispatch).
 defusedxml==0.7.1

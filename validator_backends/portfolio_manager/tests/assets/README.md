@@ -52,6 +52,7 @@ The files remain derivative works under the bundled SEED license. Their names
 do not imply endorsement by SEED, the U.S. Department of Energy, EPA, or any
 other upstream contributor.
 
-Current report downloads generated from EPA's Portfolio Manager test
-environment are deliberately deferred. These fixtures provide public
-compatibility coverage, not proof against a particular live EPA release.
+Fresh report downloads generated from EPA's Portfolio Manager UI/API are
+deliberately deferred to V2. V1 uses these reviewed public fixtures as its
+compatibility baseline; they are not proof against every current live EPA
+report variant.

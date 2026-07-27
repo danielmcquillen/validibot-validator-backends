@@ -25,6 +25,7 @@ from scripts.backend_inventory import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPO_ROOT / "backends.toml"
+JUSTFILE_PATH = REPO_ROOT / "justfile"
 
 
 def _manifest() -> dict:
@@ -38,8 +39,8 @@ def _backends() -> list[dict]:
 
 
 def _justfile_slugs() -> list[str]:
-    """Extract the developer/release backend list from the justfile."""
-    justfile = (REPO_ROOT / "justfile").read_text(encoding="utf-8")
+    """Extract the developer backend list from git's lowercase justfile."""
+    justfile = JUSTFILE_PATH.read_text(encoding="utf-8")
     match = re.search(r'^validators := "([^"]+)"$', justfile, flags=re.MULTILINE)
     assert match, "justfile must declare validators"
     return match.group(1).split()
@@ -78,10 +79,10 @@ def test_manifest_schema_and_paths_are_valid():
 
 
 def test_release_and_developer_builds_are_inventory_driven():
-    """Every release-enabled entry must be supported without a second list."""
+    """Release and local build paths must work on case-sensitive Linux hosts."""
     release_slugs = [backend["slug"] for backend in _backends() if backend.get("release") is True]
     release_yml = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    justfile = (REPO_ROOT / "Justfile").read_text(encoding="utf-8")
+    justfile = JUSTFILE_PATH.read_text(encoding="utf-8")
 
     assert _justfile_slugs() == release_slugs
     assert "matrix:" not in release_yml
@@ -162,8 +163,8 @@ def test_provider_resource_names_are_unique_bounded_and_release_specific():
 
     assert len(names) == len(validated) * 2 * 2
     assert all(len(name) <= 63 for name in names)
-    assert "vb-vs-energyplus-v0-15-1" in names
-    assert "vb-vj-portfolio-manager-v0-16-1-stg" in names
+    assert "vb-vs-energyplus-v0-15-2" in names
+    assert "vb-vj-portfolio-manager-v0-16-2-stg" in names
 
 
 def test_duplicate_provider_slug_is_rejected():

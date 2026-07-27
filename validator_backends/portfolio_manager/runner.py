@@ -660,7 +660,7 @@ def _alert_policy_findings(
 
 
 def _alert_category(heading: str) -> str | None:
-    """Map current EPA alert labels to stable configured check identities."""
+    """Map fixture-backed Portfolio Manager alert labels to stable check identities."""
     normalized = re.sub(r"[^a-z0-9]+", "", heading.casefold())
     if "month" in normalized and ("lessthan12" in normalized or "lessthantwelve" in normalized):
         return "meter_less_than_12_months"

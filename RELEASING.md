@@ -60,8 +60,11 @@ A fresh release ships these values:
 
 | Backend | Wrapper version | Bundled library |
 |---|---|---|
-| EnergyPlus | `0.15.1` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
-| FMU | `0.15.1` (`backends.toml`) | fmpy (pinned in `requirements.txt`) |
+| EnergyPlus | `0.15.2` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
+| FMU | `0.15.2` (`backends.toml`) | FMPy 0.3.30 |
+| SHACL | `0.15.2` (`backends.toml`) | pySHACL 0.40.0 |
+| Schematron | `0.15.2` (`backends.toml`) | SaxonC-HE 13.0.0 |
+| Portfolio Manager | `0.16.2` (`backends.toml`) | openpyxl 3.1.5 and xlrd 2.0.2 |
 
 Bumping the wrapper version does NOT imply bumping the bundled library,
 and vice versa. They iterate independently.
@@ -79,6 +82,19 @@ release_version = "0.15.2"
 The next `just build fmu` stamps `0.15.2`. A signed
 `fmu-v0.15.2` tag tests and publishes only FMU; it does not build another
 backend.
+
+Tags are immutable release attempts. If CI fails after a tag is pushed, leave
+that tag in place, fix the source, increment that backend's version, and create
+a new signed tag. Never force-move or reuse the failed tag.
+
+### Portfolio Manager V1 scope
+
+Portfolio Manager V1 supports the reviewed XLS, XLSX, XML, and flat ZIP
+contract proven by the public, anonymized SEED-derived fixtures in
+`validator_backends/portfolio_manager/tests/assets/`. This is fixture-backed
+compatibility, not EPA certification or a claim to accept every current
+Portfolio Manager UI/API report variant. Fresh current-EPA export
+certification is deferred to V2.
 
 ### Manual builds
 
@@ -124,11 +140,11 @@ implicitly verifies the source commit.
 # Pull the image. For production, prefer pinning by digest rather
 # than tag — operators running with VALIDATOR_BACKEND_IMAGE_POLICY=digest
 # require this anyway.
-docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1
+docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2
 
 # Resolve the digest:
 DIGEST=$(crane digest \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1)
+  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2)
 echo "Image digest: $DIGEST"
 
 # Verify the sigstore attestation against the digest. This
@@ -179,8 +195,8 @@ billing), mirror the digest to your registry:
 brew install crane   # or download from go-containerregistry releases
 
 crane copy \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1 \
-  111122223333.dkr.ecr.us-west-2.amazonaws.com/validibot-validator-backend-energyplus:v0.15.1
+  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2 \
+  111122223333.dkr.ecr.us-west-2.amazonaws.com/validibot-validator-backend-energyplus:v0.15.2
 ```
 
 The image digest is preserved across the copy, so
@@ -192,16 +208,16 @@ name.
 
 ```bash
 # On an internet-connected transit host:
-docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1
+docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2
 gh attestation verify \
-  "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1" \
+  "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2" \
   --owner danielmcquillen
-docker save -o energyplus-v0.15.1.tar \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1
+docker save -o energyplus-v0.15.2.tar \
+  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2
 
 # Transfer the tarball through your air-gap process. On the
 # air-gapped host:
-docker load -i energyplus-v0.15.1.tar
+docker load -i energyplus-v0.15.2.tar
 ```
 
 Verification happens at the network boundary (the transit host),
@@ -253,7 +269,7 @@ add an attestation-verify step before deploy:
 - name: Verify validator backend image
   run: |
     DIGEST=$(crane digest \
-      ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.1)
+      ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2)
     gh attestation verify \
       "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus@$DIGEST" \
       --owner danielmcquillen

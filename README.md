@@ -65,6 +65,13 @@ and the Portfolio Manager logo are registered trademarks owned by the U.S.
 Environmental Protection Agency. Validibot is independent and is not approved,
 certified, or endorsed by the EPA or the ENERGY STAR program.
 
+Portfolio Manager V1 compatibility is deliberately fixture-backed. Its
+reviewed, anonymized XLS, XLSX, and XML fixtures are derived from public SEED
+project files, with provenance, checksums, and fixture-hygiene tests retained
+in `validator_backends/portfolio_manager/tests/assets/`. V1 does not claim
+fresh certification against every current EPA UI/API report variant. Fresh
+current-EPA export certification is deferred to V2.
+
 ## How It Works
 
 Validator backends receive work via a standardized "envelope" containing:
@@ -220,7 +227,21 @@ read the matching inventory entry and additionally stamp:
   (`energyplus`, `fmu`, …)
 
 Each backend has its own version. EnergyPlus can move to `0.17.0` while FMU
-stays on `0.15.1`; changing one inventory entry does not release the others.
+stays on `0.15.2`; changing one inventory entry does not release the others.
+
+Current independently offered versions are:
+
+| Backend | Version |
+| --- | --- |
+| EnergyPlus | `0.15.2` |
+| FMU | `0.15.2` |
+| SHACL | `0.15.2` |
+| Schematron | `0.15.2` |
+| Portfolio Manager | `0.16.2` |
+
+Release tags are backend-specific, such as `energyplus-v0.15.2` and
+`portfolio_manager-v0.16.2`. A failed or published tag is never moved or
+reused; the correction receives a new backend version.
 
 ### Reproducible dependencies and legal evidence
 
@@ -252,7 +273,7 @@ version axes:
 
 | Axis | Value | Bumped when |
 |---|---|---|
-| Wrapper version (`backends.toml` `release_version`) | `0.15.1` | Wrapper code, image layout, or output semantics change |
+| Wrapper version (`backends.toml` `release_version`) | `0.15.2` | Wrapper code, image layout, or output semantics change |
 | Bundled EnergyPlus binary | `25.2.0` | A newer EnergyPlus release is downloaded |
 
 These are independent:
@@ -272,7 +293,7 @@ library version. Bumping the bundled library does NOT imply bumping
 ```bash
 docker image inspect validibot-validator-backend-energyplus:latest \
   --format '{{ index .Config.Labels "org.opencontainers.image.version" }}'
-# → 0.15.1
+# → 0.15.2
 
 docker image inspect validibot-validator-backend-energyplus:latest \
   --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
@@ -305,12 +326,23 @@ The supported just recipes always pass the version read from
 > [!IMPORTANT]
 > **After updating dependencies (especially `validibot-shared`):**
 >
-> Docker caches build layers including pip install results. When you update a dependency version in `uv.lock`, a normal build may reuse cached layers with the old package version.
+> Docker caches build layers including pip install results. When you update a
+> dependency version in `uv.lock`, a normal build may reuse cached layers with
+> the old package version.
 >
-> To ensure the new version is installed, use `--no-cache`:
+> To ensure the new version is installed, read the backend version from the
+> inventory and pass the same required identity arguments as the supported
+> recipes:
 >
 > ```bash
-> docker buildx build --no-cache -f validator_backends/energyplus/Dockerfile -t validibot-validator-backend-energyplus:latest .
+> VERSION="$(python3 scripts/backend_inventory.py field energyplus release_version)"
+> docker buildx build --no-cache --load \
+>   -f validator_backends/energyplus/Dockerfile \
+>   --build-arg VALIDATOR_BACKEND_VERSION="$VERSION" \
+>   --build-arg VALIDATOR_BACKEND_REVISION="$(git rev-parse --short HEAD)" \
+>   --build-arg VALIDATOR_BACKEND_SLUG=energyplus \
+>   -t "validibot-validator-backend-energyplus:v$VERSION" \
+>   .
 > ```
 >
 > Signs that cached layers are being used: build output shows `CACHED` for the pip install step, and your changes don't take effect at runtime.
@@ -402,16 +434,17 @@ Application task → Validibot worker → deterministic provider task
 - Attempt-scoped credentials and an authenticated HTTP callback when complete
 
 Production deployment is intentionally absent from this repository. Release
-the backend here, then use the `validibot` repository's complete staging and
-acceptance commands:
+the backend here, then use the `validibot-project` repository's release
+operator:
 
 ```bash
-just gcp validator-deploy-all prod vX.Y.Z
-just gcp validator-acceptance prod vX.Y.Z
+just validator-status
+just validator-update energyplus
 ```
 
-They verify the signed tag, attestation, equal GHCR/GAR digest, provider
-revision, and IAM policy before registration or activation.
+It verifies the backend-specific signed tag, release record, attestation,
+equal GHCR/GAR digest, provider revision, and IAM policy; stages both execution
+shapes; runs acceptance; and activates only that backend.
 
 ## Container Registry Setup
 
@@ -545,18 +578,10 @@ validibot-validator-backends/
     │   └── envelope_loader.py    # Envelope serialization
     │
     ├── energyplus/           # EnergyPlus validator
-    │   ├── Dockerfile
-    │   ├── __metadata__.py   # Validator metadata
-    │   ├── main.py           # Container entrypoint
-    │   ├── runner.py         # Simulation logic
-    │   └── tests/
-    │
-    └── fmu/                  # FMU validator
-        ├── Dockerfile
-        ├── __metadata__.py
-        ├── main.py
-        ├── runner.py
-        └── tests/
+    ├── fmu/                  # FMU validator
+    ├── shacl/                # SHACL validator
+    ├── schematron/           # Schematron validator
+    └── portfolio_manager/    # Building benchmark report validator
 ```
 
 ## Creating a Custom Validator Backend
@@ -593,14 +618,25 @@ def get_metadata():
     return METADATA
 ```
 
-### 3. Bake the Wrapper Version into the Dockerfile
+### 3. Register the Backend Version
+
+Add one entry to `backends.toml`. This inventory entry—not the Dockerfile—is
+the version authority:
+
+```toml
+[[backend]]
+slug = "myvalidator"
+provider_resource_slug = "myvalidator"
+release_version = "0.1.0"
+# Add the remaining paths and runtime fields by following an existing backend.
+```
+
+### 4. Accept the Version Build Argument in the Dockerfile
 
 Edit `validator_backends/myvalidator/Dockerfile`:
 
 ```dockerfile
-# OUR backend wrapper version. Bump when the wrapper code changes.
-# This is independent of any upstream library version the wrapper bundles.
-ARG VALIDATOR_BACKEND_VERSION="0.1.0"
+ARG VALIDATOR_BACKEND_VERSION
 ARG VALIDATOR_BACKEND_REVISION="unknown"
 ARG VALIDATOR_BACKEND_SOURCE="https://github.com/your-org/your-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="myvalidator"
@@ -612,11 +648,11 @@ LABEL org.opencontainers.image.title="My Custom Validator backend" \
       io.validibot.validator-backend.slug="${VALIDATOR_BACKEND_SLUG}"
 ```
 
-The build will stamp `0.1.0` (or whatever you set) onto the resulting image
-as an OCI label, where `docker inspect` and the
+The build reads `0.1.0` (or the later version) from `backends.toml` and stamps
+it onto the resulting image as an OCI label, where `docker inspect` and the
 `just self-hosted validators` operator inventory recipe can read it back.
 
-### 3. Create Typed Envelopes
+### 5. Create Typed Envelopes
 
 In [validibot-shared](https://github.com/danielmcquillen/validibot-shared), define your typed envelopes:
 
@@ -643,7 +679,7 @@ class MyValidatorOutputEnvelope(ValidationOutputEnvelope):
     outputs: MyValidatorOutputs | None = None
 ```
 
-### 4. Implement Runner
+### 6. Implement Runner
 
 Edit `validator_backends/myvalidator/runner.py`:
 
@@ -687,7 +723,7 @@ def run_validation(envelope: MyValidatorInputEnvelope) -> MyValidatorOutputEnvel
     )
 ```
 
-### 5. Update Dockerfile
+### 7. Update Dockerfile
 
 Add the backend to `backends.toml` and the matching optional dependency group
 to `pyproject.toml`, then generate its lock and application SBOM. Edit
@@ -740,7 +776,7 @@ USER validibot
 CMD ["python", "-m", "validator_backends.myvalidator.main"]
 ```
 
-### 6. Build and Test
+### 8. Build and Test
 
 ```bash
 # Build your validator

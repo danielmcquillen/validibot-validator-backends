@@ -526,7 +526,7 @@ def test_invalid_multi_property_member_does_not_hide_valid_fixture_member(
 def test_real_xml_alert_metrics_satisfy_every_enabled_quality_check(
     tmp_path: Path,
 ) -> None:
-    """Current EPA metric names must make configured checks verifiable."""
+    """Fixture-backed metric names must make configured checks verifiable."""
     report = (ASSETS / "portfolio-manager-custom-report-single-anonymized.xml").read_bytes()
     envelope = _envelope(
         tmp_path,

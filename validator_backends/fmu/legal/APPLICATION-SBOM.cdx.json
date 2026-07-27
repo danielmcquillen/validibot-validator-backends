@@ -2,18 +2,18 @@
   "bomFormat": "CycloneDX",
   "components": [
     {
-      "bom-ref": "annotated-types-2@0.7.0",
+      "bom-ref": "annotated-types-2@0.8.0",
       "name": "annotated-types",
-      "purl": "pkg:pypi/annotated-types@0.7.0",
+      "purl": "pkg:pypi/annotated-types@0.8.0",
       "type": "library",
-      "version": "0.7.0"
+      "version": "0.8.0"
     },
     {
-      "bom-ref": "anyio-3@4.14.1",
+      "bom-ref": "anyio-3@4.14.2",
       "name": "anyio",
-      "purl": "pkg:pypi/anyio@4.14.1",
+      "purl": "pkg:pypi/anyio@4.14.2",
       "type": "library",
-      "version": "4.14.1"
+      "version": "4.14.2"
     },
     {
       "bom-ref": "attrs-4@26.1.0",
@@ -23,11 +23,11 @@
       "version": "26.1.0"
     },
     {
-      "bom-ref": "certifi-5@2026.6.17",
+      "bom-ref": "certifi-5@2026.7.22",
       "name": "certifi",
-      "purl": "pkg:pypi/certifi@2026.6.17",
+      "purl": "pkg:pypi/certifi@2026.7.22",
       "type": "library",
-      "version": "2026.6.17"
+      "version": "2026.7.22"
     },
     {
       "bom-ref": "cffi-6@2.1.0",
@@ -50,11 +50,11 @@
       "version": "3.4.9"
     },
     {
-      "bom-ref": "cmake-8@4.3.4",
+      "bom-ref": "cmake-8@4.4.0",
       "name": "cmake",
-      "purl": "pkg:pypi/cmake@4.3.4",
+      "purl": "pkg:pypi/cmake@4.4.0",
       "type": "library",
-      "version": "4.3.4"
+      "version": "4.4.0"
     },
     {
       "bom-ref": "cryptography-9@49.0.0",
@@ -71,11 +71,11 @@
       "version": "0.7.1"
     },
     {
-      "bom-ref": "fastjsonschema-11@2.21.2",
+      "bom-ref": "fastjsonschema-11@2.22.0",
       "name": "fastjsonschema",
-      "purl": "pkg:pypi/fastjsonschema@2.21.2",
+      "purl": "pkg:pypi/fastjsonschema@2.22.0",
       "type": "library",
-      "version": "2.21.2"
+      "version": "2.22.0"
     },
     {
       "bom-ref": "fmpy-12@0.3.30",
@@ -85,18 +85,18 @@
       "version": "0.3.30"
     },
     {
-      "bom-ref": "google-api-core-13@2.31.0",
+      "bom-ref": "google-api-core-13@2.33.0",
       "name": "google-api-core",
-      "purl": "pkg:pypi/google-api-core@2.31.0",
+      "purl": "pkg:pypi/google-api-core@2.33.0",
       "type": "library",
-      "version": "2.31.0"
+      "version": "2.33.0"
     },
     {
-      "bom-ref": "google-auth-14@2.56.0",
+      "bom-ref": "google-auth-14@2.56.2",
       "name": "google-auth",
-      "purl": "pkg:pypi/google-auth@2.56.0",
+      "purl": "pkg:pypi/google-auth@2.56.2",
       "type": "library",
-      "version": "2.56.0"
+      "version": "2.56.2"
     },
     {
       "bom-ref": "google-cloud-core-15@2.6.0",
@@ -232,18 +232,18 @@
       "version": "2.5.1"
     },
     {
-      "bom-ref": "platformdirs-34@4.10.0",
+      "bom-ref": "platformdirs-34@4.11.0",
       "name": "platformdirs",
-      "purl": "pkg:pypi/platformdirs@4.10.0",
+      "purl": "pkg:pypi/platformdirs@4.11.0",
       "type": "library",
-      "version": "4.10.0"
+      "version": "4.11.0"
     },
     {
-      "bom-ref": "proto-plus-35@1.28.1",
+      "bom-ref": "proto-plus-35@1.28.2",
       "name": "proto-plus",
-      "purl": "pkg:pypi/proto-plus@1.28.1",
+      "purl": "pkg:pypi/proto-plus@1.28.2",
       "type": "library",
-      "version": "1.28.1"
+      "version": "1.28.2"
     },
     {
       "bom-ref": "protobuf-36@7.35.1",
@@ -315,11 +315,11 @@
       "version": "2026.6.3"
     },
     {
-      "bom-ref": "sentry-sdk-45@2.66.0",
+      "bom-ref": "sentry-sdk-45@2.66.1",
       "name": "sentry-sdk",
-      "purl": "pkg:pypi/sentry-sdk@2.66.0",
+      "purl": "pkg:pypi/sentry-sdk@2.66.1",
       "type": "library",
-      "version": "2.66.0"
+      "version": "2.66.1"
     },
     {
       "bom-ref": "traitlets-46@5.15.1",
@@ -359,19 +359,19 @@
   ],
   "dependencies": [
     {
-      "ref": "annotated-types-2@0.7.0"
+      "ref": "annotated-types-2@0.8.0"
     },
     {
       "dependsOn": [
         "idna-23@3.18"
       ],
-      "ref": "anyio-3@4.14.1"
+      "ref": "anyio-3@4.14.2"
     },
     {
       "ref": "attrs-4@26.1.0"
     },
     {
-      "ref": "certifi-5@2026.6.17"
+      "ref": "certifi-5@2026.7.22"
     },
     {
       "dependsOn": [
@@ -383,7 +383,7 @@
       "ref": "charset-normalizer-7@3.4.9"
     },
     {
-      "ref": "cmake-8@4.3.4"
+      "ref": "cmake-8@4.4.0"
     },
     {
       "dependsOn": [
@@ -395,12 +395,12 @@
       "ref": "defusedxml-10@0.7.1"
     },
     {
-      "ref": "fastjsonschema-11@2.21.2"
+      "ref": "fastjsonschema-11@2.22.0"
     },
     {
       "dependsOn": [
         "attrs-4@26.1.0",
-        "cmake-8@4.3.4",
+        "cmake-8@4.4.0",
         "jinja2-24@3.1.6",
         "lark-28@1.3.1",
         "lxml-29@6.1.1",
@@ -412,32 +412,32 @@
     },
     {
       "dependsOn": [
-        "google-auth-14@2.56.0",
+        "google-auth-14@2.56.2",
         "googleapis-common-protos-19@1.75.0",
-        "proto-plus-35@1.28.1",
+        "proto-plus-35@1.28.2",
         "protobuf-36@7.35.1",
         "requests-43@2.34.2"
       ],
-      "ref": "google-api-core-13@2.31.0"
+      "ref": "google-api-core-13@2.33.0"
     },
     {
       "dependsOn": [
         "cryptography-9@49.0.0",
         "pyasn1-modules-38@0.4.2"
       ],
-      "ref": "google-auth-14@2.56.0"
+      "ref": "google-auth-14@2.56.2"
     },
     {
       "dependsOn": [
-        "google-api-core-13@2.31.0",
-        "google-auth-14@2.56.0"
+        "google-api-core-13@2.33.0",
+        "google-auth-14@2.56.2"
       ],
       "ref": "google-cloud-core-15@2.6.0"
     },
     {
       "dependsOn": [
-        "google-api-core-13@2.31.0",
-        "google-auth-14@2.56.0",
+        "google-api-core-13@2.33.0",
+        "google-auth-14@2.56.2",
         "google-cloud-core-15@2.6.0",
         "google-crc32c-17@1.8.0",
         "google-resumable-media-18@2.10.0",
@@ -465,15 +465,15 @@
     },
     {
       "dependsOn": [
-        "certifi-5@2026.6.17",
+        "certifi-5@2026.7.22",
         "h11-20@0.16.0"
       ],
       "ref": "httpcore-21@1.0.9"
     },
     {
       "dependsOn": [
-        "anyio-3@4.14.1",
-        "certifi-5@2026.6.17",
+        "anyio-3@4.14.2",
+        "certifi-5@2026.7.22",
         "httpcore-21@1.0.9",
         "idna-23@3.18"
       ],
@@ -505,7 +505,7 @@
     },
     {
       "dependsOn": [
-        "platformdirs-34@4.10.0",
+        "platformdirs-34@4.11.0",
         "traitlets-46@5.15.1"
       ],
       "ref": "jupyter-core-27@5.9.1"
@@ -524,7 +524,7 @@
     },
     {
       "dependsOn": [
-        "fastjsonschema-11@2.21.2",
+        "fastjsonschema-11@2.22.0",
         "jsonschema-25@4.26.0",
         "jupyter-core-27@5.9.1",
         "traitlets-46@5.15.1"
@@ -535,13 +535,13 @@
       "ref": "numpy-33@2.5.1"
     },
     {
-      "ref": "platformdirs-34@4.10.0"
+      "ref": "platformdirs-34@4.11.0"
     },
     {
       "dependsOn": [
         "protobuf-36@7.35.1"
       ],
-      "ref": "proto-plus-35@1.28.1"
+      "ref": "proto-plus-35@1.28.2"
     },
     {
       "ref": "protobuf-36@7.35.1"
@@ -560,7 +560,7 @@
     },
     {
       "dependsOn": [
-        "annotated-types-2@0.7.0",
+        "annotated-types-2@0.8.0",
         "pydantic-core-41@2.46.4",
         "typing-extensions-47@4.16.0",
         "typing-inspection-48@0.4.2"
@@ -582,7 +582,7 @@
     },
     {
       "dependsOn": [
-        "certifi-5@2026.6.17",
+        "certifi-5@2026.7.22",
         "charset-normalizer-7@3.4.9",
         "idna-23@3.18",
         "urllib3-49@2.7.0"
@@ -594,10 +594,10 @@
     },
     {
       "dependsOn": [
-        "certifi-5@2026.6.17",
+        "certifi-5@2026.7.22",
         "urllib3-49@2.7.0"
       ],
-      "ref": "sentry-sdk-45@2.66.0"
+      "ref": "sentry-sdk-45@2.66.1"
     },
     {
       "ref": "traitlets-46@5.15.1"
@@ -624,7 +624,7 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "validibot-validator-backend-fmu@0.15.1",
+      "bom-ref": "validibot-validator-backend-fmu@0.15.2",
       "name": "validibot-validator-backend-fmu",
       "properties": [
         {
@@ -637,7 +637,7 @@
         }
       ],
       "type": "application",
-      "version": "0.15.1"
+      "version": "0.15.2"
     },
     "tools": [
       {
@@ -647,7 +647,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:9f375e00-9b46-5236-af07-f36fe66d64e0",
+  "serialNumber": "urn:uuid:873f4565-2877-573f-851c-55b90d331f61",
   "specVersion": "1.5",
   "version": 1
 }

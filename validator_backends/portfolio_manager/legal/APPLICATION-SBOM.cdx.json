@@ -2,25 +2,25 @@
   "bomFormat": "CycloneDX",
   "components": [
     {
-      "bom-ref": "annotated-types-2@0.7.0",
+      "bom-ref": "annotated-types-2@0.8.0",
       "name": "annotated-types",
-      "purl": "pkg:pypi/annotated-types@0.7.0",
+      "purl": "pkg:pypi/annotated-types@0.8.0",
       "type": "library",
-      "version": "0.7.0"
+      "version": "0.8.0"
     },
     {
-      "bom-ref": "anyio-3@4.14.1",
+      "bom-ref": "anyio-3@4.14.2",
       "name": "anyio",
-      "purl": "pkg:pypi/anyio@4.14.1",
+      "purl": "pkg:pypi/anyio@4.14.2",
       "type": "library",
-      "version": "4.14.1"
+      "version": "4.14.2"
     },
     {
-      "bom-ref": "certifi-4@2026.6.17",
+      "bom-ref": "certifi-4@2026.7.22",
       "name": "certifi",
-      "purl": "pkg:pypi/certifi@2026.6.17",
+      "purl": "pkg:pypi/certifi@2026.7.22",
       "type": "library",
-      "version": "2026.6.17"
+      "version": "2026.7.22"
     },
     {
       "bom-ref": "cffi-5@2.1.0",
@@ -64,18 +64,18 @@
       "version": "2.0.0"
     },
     {
-      "bom-ref": "google-api-core-10@2.31.0",
+      "bom-ref": "google-api-core-10@2.33.0",
       "name": "google-api-core",
-      "purl": "pkg:pypi/google-api-core@2.31.0",
+      "purl": "pkg:pypi/google-api-core@2.33.0",
       "type": "library",
-      "version": "2.31.0"
+      "version": "2.33.0"
     },
     {
-      "bom-ref": "google-auth-11@2.56.0",
+      "bom-ref": "google-auth-11@2.56.2",
       "name": "google-auth",
-      "purl": "pkg:pypi/google-auth@2.56.0",
+      "purl": "pkg:pypi/google-auth@2.56.2",
       "type": "library",
-      "version": "2.56.0"
+      "version": "2.56.2"
     },
     {
       "bom-ref": "google-cloud-core-12@2.6.0",
@@ -148,11 +148,11 @@
       "version": "3.1.5"
     },
     {
-      "bom-ref": "proto-plus-22@1.28.1",
+      "bom-ref": "proto-plus-22@1.28.2",
       "name": "proto-plus",
-      "purl": "pkg:pypi/proto-plus@1.28.1",
+      "purl": "pkg:pypi/proto-plus@1.28.2",
       "type": "library",
-      "version": "1.28.1"
+      "version": "1.28.2"
     },
     {
       "bom-ref": "protobuf-23@7.35.1",
@@ -210,11 +210,11 @@
       "version": "2.34.2"
     },
     {
-      "bom-ref": "sentry-sdk-30@2.66.0",
+      "bom-ref": "sentry-sdk-30@2.66.1",
       "name": "sentry-sdk",
-      "purl": "pkg:pypi/sentry-sdk@2.66.0",
+      "purl": "pkg:pypi/sentry-sdk@2.66.1",
       "type": "library",
-      "version": "2.66.0"
+      "version": "2.66.1"
     },
     {
       "bom-ref": "typing-extensions-31@4.16.0",
@@ -254,16 +254,16 @@
   ],
   "dependencies": [
     {
-      "ref": "annotated-types-2@0.7.0"
+      "ref": "annotated-types-2@0.8.0"
     },
     {
       "dependsOn": [
         "idna-20@3.18"
       ],
-      "ref": "anyio-3@4.14.1"
+      "ref": "anyio-3@4.14.2"
     },
     {
-      "ref": "certifi-4@2026.6.17"
+      "ref": "certifi-4@2026.7.22"
     },
     {
       "dependsOn": [
@@ -288,32 +288,32 @@
     },
     {
       "dependsOn": [
-        "google-auth-11@2.56.0",
+        "google-auth-11@2.56.2",
         "googleapis-common-protos-16@1.75.0",
-        "proto-plus-22@1.28.1",
+        "proto-plus-22@1.28.2",
         "protobuf-23@7.35.1",
         "requests-29@2.34.2"
       ],
-      "ref": "google-api-core-10@2.31.0"
+      "ref": "google-api-core-10@2.33.0"
     },
     {
       "dependsOn": [
         "cryptography-7@49.0.0",
         "pyasn1-modules-25@0.4.2"
       ],
-      "ref": "google-auth-11@2.56.0"
+      "ref": "google-auth-11@2.56.2"
     },
     {
       "dependsOn": [
-        "google-api-core-10@2.31.0",
-        "google-auth-11@2.56.0"
+        "google-api-core-10@2.33.0",
+        "google-auth-11@2.56.2"
       ],
       "ref": "google-cloud-core-12@2.6.0"
     },
     {
       "dependsOn": [
-        "google-api-core-10@2.31.0",
-        "google-auth-11@2.56.0",
+        "google-api-core-10@2.33.0",
+        "google-auth-11@2.56.2",
         "google-cloud-core-12@2.6.0",
         "google-crc32c-14@1.8.0",
         "google-resumable-media-15@2.10.0",
@@ -341,15 +341,15 @@
     },
     {
       "dependsOn": [
-        "certifi-4@2026.6.17",
+        "certifi-4@2026.7.22",
         "h11-17@0.16.0"
       ],
       "ref": "httpcore-18@1.0.9"
     },
     {
       "dependsOn": [
-        "anyio-3@4.14.1",
-        "certifi-4@2026.6.17",
+        "anyio-3@4.14.2",
+        "certifi-4@2026.7.22",
         "httpcore-18@1.0.9",
         "idna-20@3.18"
       ],
@@ -368,7 +368,7 @@
       "dependsOn": [
         "protobuf-23@7.35.1"
       ],
-      "ref": "proto-plus-22@1.28.1"
+      "ref": "proto-plus-22@1.28.2"
     },
     {
       "ref": "protobuf-23@7.35.1"
@@ -387,7 +387,7 @@
     },
     {
       "dependsOn": [
-        "annotated-types-2@0.7.0",
+        "annotated-types-2@0.8.0",
         "pydantic-core-28@2.46.4",
         "typing-extensions-31@4.16.0",
         "typing-inspection-32@0.4.2"
@@ -402,7 +402,7 @@
     },
     {
       "dependsOn": [
-        "certifi-4@2026.6.17",
+        "certifi-4@2026.7.22",
         "charset-normalizer-6@3.4.9",
         "idna-20@3.18",
         "urllib3-33@2.7.0"
@@ -411,10 +411,10 @@
     },
     {
       "dependsOn": [
-        "certifi-4@2026.6.17",
+        "certifi-4@2026.7.22",
         "urllib3-33@2.7.0"
       ],
-      "ref": "sentry-sdk-30@2.66.0"
+      "ref": "sentry-sdk-30@2.66.1"
     },
     {
       "ref": "typing-extensions-31@4.16.0"
@@ -441,7 +441,7 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "validibot-validator-backend-portfolio-manager@0.16.1",
+      "bom-ref": "validibot-validator-backend-portfolio-manager@0.16.2",
       "name": "validibot-validator-backend-portfolio-manager",
       "properties": [
         {
@@ -454,7 +454,7 @@
         }
       ],
       "type": "application",
-      "version": "0.16.1"
+      "version": "0.16.2"
     },
     "tools": [
       {
@@ -464,7 +464,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:73ff5361-cc8c-5819-a449-6461a8e2b4af",
+  "serialNumber": "urn:uuid:eed04adb-728a-5ee2-ba5e-dd7440ced3fb",
   "specVersion": "1.5",
   "version": 1
 }
