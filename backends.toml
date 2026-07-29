@@ -3,7 +3,7 @@ schema_version = 2
 [[backend]]
 slug = "energyplus"
 provider_resource_slug = "energyplus"
-release_version = "0.15.3"
+release_version = "0.15.4"
 dockerfile = "validator_backends/energyplus/Dockerfile"
 requirements = "validator_backends/energyplus/requirements.txt"
 requirements_lock = "validator_backends/energyplus/requirements.lock"
