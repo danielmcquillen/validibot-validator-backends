@@ -57,7 +57,7 @@ The core Validibot platform triggers these backends, passes input via the standa
 | **FMU** | Validates and executes Functional Mock-up Units | FMU structure validation, variable discovery, bounded simulation testing |
 | **SHACL** | Validates RDF graphs in an isolated container | RDF parsing, SHACL shapes, SHACL-AF/SPARQL isolation, semantic model checks |
 | **Schematron** | Validates XML documents against Schematron rules | Peppol/EN 16931-style business rules, SVRL findings, XSLT isolation |
-| **Building benchmark reports** | Validates exports from ENERGY STAR® Portfolio Manager® | XLS/XLSX/XML normalization, safe ZIP collections, EBL reconciliation, EUIt and Washington Form C facts |
+| **Building benchmark reports** | Validates exports from ENERGY STAR® Portfolio Manager® | XLS/XLSX/XML normalization, safe ZIP collections, EBL reconciliation, EUIt facts |
 
 ENERGY STAR and the ENERGY STAR mark are registered trademarks owned by the
 U.S. Environmental Protection Agency. The name ENERGY STAR Portfolio Manager
