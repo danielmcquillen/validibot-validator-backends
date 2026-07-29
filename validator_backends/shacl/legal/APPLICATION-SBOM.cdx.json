@@ -231,11 +231,11 @@
       "version": "3.3.2"
     },
     {
-      "bom-ref": "pyshacl-33@0.40.0",
+      "bom-ref": "pyshacl-33@0.40.1",
       "name": "pyshacl",
-      "purl": "pkg:pypi/pyshacl@0.40.0",
+      "purl": "pkg:pypi/pyshacl@0.40.1",
       "type": "library",
-      "version": "0.40.0"
+      "version": "0.40.1"
     },
     {
       "bom-ref": "rdflib-34@7.6.0",
@@ -464,7 +464,7 @@
         "prettytable-24@3.18.0",
         "rdflib-34@7.6.0"
       ],
-      "ref": "pyshacl-33@0.40.0"
+      "ref": "pyshacl-33@0.40.1"
     },
     {
       "dependsOn": [
@@ -537,7 +537,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:8f89fe37-d5ff-544d-bfe6-a160dc31c9fc",
+  "serialNumber": "urn:uuid:c306b650-cd85-5891-845f-9c3df58dd3c1",
   "specVersion": "1.5",
   "version": 1
 }
