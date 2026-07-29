@@ -5,7 +5,7 @@
 **Containerized validator backends for the Validibot data validation platform**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/danielmcquillen/validibot-validator-backends/badge)](https://scorecard.dev/viewer/?uri=github.com/danielmcquillen/validibot-validator-backends)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/mcquilleninteractive/validibot-validator-backends/badge)](https://scorecard.dev/viewer/?uri=github.com/mcquilleninteractive/validibot-validator-backends)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 
@@ -29,10 +29,10 @@ This repository is one component of the Validibot open-source data validation pl
 
 | Repository                                                                                      | Description                                       |
 | ----------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| **[validibot](https://github.com/danielmcquillen/validibot)**                                   | Core platform — web UI, REST API, workflow engine |
-| **[validibot-cli](https://github.com/danielmcquillen/validibot-cli)**                           | Command-line interface                            |
-| **[validibot-validator-backends](https://github.com/danielmcquillen/validibot-validator-backends)** (this repo) | Validator backends for advanced validators        |
-| **[validibot-shared](https://github.com/danielmcquillen/validibot-shared)**                     | Shared Pydantic models for data interchange       |
+| **[validibot](https://github.com/mcquilleninteractive/validibot)**                                   | Core platform — web UI, REST API, workflow engine |
+| **[validibot-cli](https://github.com/mcquilleninteractive/validibot-cli)**                           | Command-line interface                            |
+| **[validibot-validator-backends](https://github.com/mcquilleninteractive/validibot-validator-backends)** (this repo) | Validator backends for advanced validators        |
+| **[validibot-shared](https://github.com/mcquilleninteractive/validibot-shared)**                     | Shared Pydantic models for data interchange       |
 
 ## What are Validibot Validator Backends?
 
@@ -47,7 +47,7 @@ Unlike Validibot's built-in "simple" validators (JSON Schema, XML Schema, etc.) 
 - **Are secure by default** — Network isolation, memory limits, and automatic cleanup
 - **Scale independently** — Can run on separate infrastructure from the core platform
 
-The core Validibot platform triggers these backends, passes input via the standardized envelope format (defined in [validibot-shared](https://github.com/danielmcquillen/validibot-shared)), and processes the results when complete.
+The core Validibot platform triggers these backends, passes input via the standardized envelope format (defined in [validibot-shared](https://github.com/mcquilleninteractive/validibot-shared)), and processes the results when complete.
 
 ## Available Validator Backends
 
@@ -177,7 +177,7 @@ validating that the declared contract has exactly one compatible file.
 
 ```bash
 # Clone the repository
-git clone https://github.com/danielmcquillen/validibot-validator-backends.git
+git clone https://github.com/mcquilleninteractive/validibot-validator-backends.git
 cd validibot-validator-backends
 
 # Build a specific validator
@@ -227,20 +227,20 @@ read the matching inventory entry and additionally stamp:
   (`energyplus`, `fmu`, …)
 
 Each backend has its own version. EnergyPlus can move to `0.17.0` while FMU
-stays on `0.15.2`; changing one inventory entry does not release the others.
+stays on `0.15.3`; changing one inventory entry does not release the others.
 
 Current independently offered versions are:
 
 | Backend | Version |
 | --- | --- |
-| EnergyPlus | `0.15.2` |
-| FMU | `0.15.2` |
-| SHACL | `0.15.2` |
-| Schematron | `0.15.2` |
-| Portfolio Manager | `0.16.2` |
+| EnergyPlus | `0.15.3` |
+| FMU | `0.15.3` |
+| SHACL | `0.15.3` |
+| Schematron | `0.15.3` |
+| Portfolio Manager | `0.16.3` |
 
-Release tags are backend-specific, such as `energyplus-v0.15.2` and
-`portfolio_manager-v0.16.2`. A failed or published tag is never moved or
+Release tags are backend-specific, such as `energyplus-v0.15.3` and
+`portfolio_manager-v0.16.3`. A failed or published tag is never moved or
 reused; the correction receives a new backend version.
 
 ### Reproducible dependencies and legal evidence
@@ -273,7 +273,7 @@ version axes:
 
 | Axis | Value | Bumped when |
 |---|---|---|
-| Wrapper version (`backends.toml` `release_version`) | `0.15.2` | Wrapper code, image layout, or output semantics change |
+| Wrapper version (`backends.toml` `release_version`) | `0.15.3` | Wrapper code, image layout, or output semantics change |
 | Bundled EnergyPlus binary | `25.2.0` | A newer EnergyPlus release is downloaded |
 
 These are independent:
@@ -293,7 +293,7 @@ library version. Bumping the bundled library does NOT imply bumping
 ```bash
 docker image inspect validibot-validator-backend-energyplus:latest \
   --format '{{ index .Config.Labels "org.opencontainers.image.version" }}'
-# → 0.15.2
+# → 0.15.3
 
 docker image inspect validibot-validator-backend-energyplus:latest \
   --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
@@ -614,6 +614,7 @@ METADATA = {
     },
 }
 
+
 def get_metadata():
     return METADATA
 ```
@@ -654,7 +655,7 @@ it onto the resulting image as an OCI label, where `docker inspect` and the
 
 ### 5. Create Typed Envelopes
 
-In [validibot-shared](https://github.com/danielmcquillen/validibot-shared), define your typed envelopes:
+In [validibot-shared](https://github.com/mcquilleninteractive/validibot-shared), define your typed envelopes:
 
 ```python
 # validibot_shared/myvalidator/envelopes.py
@@ -664,16 +665,20 @@ from validibot_shared.validations.envelopes import (
     ValidationOutputEnvelope,
 )
 
+
 class MyValidatorInputs(BaseModel):
     strict_mode: bool = False
     max_errors: int = 100
+
 
 class MyValidatorOutputs(BaseModel):
     items_checked: int
     items_passed: int
 
+
 class MyValidatorInputEnvelope(ValidationInputEnvelope):
     inputs: MyValidatorInputs
+
 
 class MyValidatorOutputEnvelope(ValidationOutputEnvelope):
     outputs: MyValidatorOutputs | None = None
@@ -691,6 +696,7 @@ from validibot_shared.myvalidator.envelopes import (
 )
 from validibot_shared.validations.envelopes import ValidationMessage, ValidationStatus
 
+
 def run_validation(envelope: MyValidatorInputEnvelope) -> MyValidatorOutputEnvelope:
     messages = []
     items_checked = 0
@@ -703,11 +709,13 @@ def run_validation(envelope: MyValidatorInputEnvelope) -> MyValidatorOutputEnvel
         if valid:
             items_passed += 1
         else:
-            messages.append(ValidationMessage(
-                severity="error",
-                code="MY001",
-                text=f"Validation failed for {input_file.name}",
-            ))
+            messages.append(
+                ValidationMessage(
+                    severity="error",
+                    code="MY001",
+                    text=f"Validation failed for {input_file.name}",
+                )
+            )
 
     status = ValidationStatus.SUCCESS if not messages else ValidationStatus.FAILURE
 
@@ -833,7 +841,7 @@ The `validator_backends.core` module provides helpers for steps 2, 5, 6, and 7.
 
 ```bash
 # Clone the repository
-git clone https://github.com/danielmcquillen/validibot-validator-backends.git
+git clone https://github.com/mcquilleninteractive/validibot-validator-backends.git
 cd validibot-validator-backends
 
 # Install dependencies
@@ -868,8 +876,8 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-[Validibot Platform](https://github.com/danielmcquillen/validibot) •
+[Validibot Platform](https://github.com/mcquilleninteractive/validibot) •
 [Documentation](https://docs.validibot.com) •
-[Report Issues](https://github.com/danielmcquillen/validibot-validator-backends/issues)
+[Report Issues](https://github.com/mcquilleninteractive/validibot-validator-backends/issues)
 
 </div>

@@ -2,17 +2,19 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.2.x   | :white_check_mark: |
-| < 0.2   | :x:                |
+| Release | Supported |
+| --- | --- |
+| Latest published version of each backend | :white_check_mark: |
+| Older backend releases | :x: |
 
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability in this project, please report it
 responsibly. **Do not open a public GitHub issue for security vulnerabilities.**
 
-**Email:** [security@validibot.com](mailto:security@validibot.com)
+Use this repository's **Security** tab to submit a private vulnerability
+report. If that is unavailable, email
+[security@validibot.com](mailto:security@validibot.com).
 
 Please include:
 
@@ -36,8 +38,8 @@ these practices:
   configures these for Cloud Run Jobs.
 - **Non-root execution:** Containers run as a non-root `validibot` user
   (UID 1000).
-- **Image provenance:** Use immutable image tags (git SHA) rather than
-  `:latest` in production. Only pull images from your own private registry.
+- **Image provenance:** Resolve a version tag to its immutable digest, verify
+  the GitHub artifact attestation, and deploy by digest rather than `:latest`.
 - **Access control:** Restrict who can push container images. Use separate
   service accounts for build/push vs. runtime execution.
 - **Input validation:** The Validibot platform validates input envelopes
@@ -49,5 +51,5 @@ these practices:
 This security policy covers the `validibot-validator-backends` repository only. For
 security issues in other Validibot components, see:
 
-- [validibot](https://github.com/danielmcquillen/validibot) (core platform)
-- [validibot-shared](https://github.com/danielmcquillen/validibot-shared) (shared models)
+- [validibot](https://github.com/mcquilleninteractive/validibot) (core platform)
+- [validibot-shared](https://github.com/mcquilleninteractive/validibot-shared) (shared models)

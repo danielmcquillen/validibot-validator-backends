@@ -481,10 +481,7 @@ release BACKEND:
         fi
     fi
 
-    uv run python scripts/backend_artifacts.py check --backend "{{BACKEND}}"
-    uv run --all-extras python scripts/generate_legal_artifacts.py \
-        --policy legal/license-policy.toml \
-        --check-only
+    just check
 
     echo ""
     echo "About to sign and push tag $TAG."
@@ -497,6 +494,13 @@ release BACKEND:
     # .github/workflows/release.yml verifies the signature and
     # publishes the release artefacts.
     git tag -s "$TAG" -m "$TAG"
+    if ! git \
+        -c gpg.format=ssh \
+        -c gpg.ssh.allowedSignersFile=.allowed_signers \
+        verify-tag "$TAG"; then
+        echo "✗ Local tag verification failed; the tag was not pushed."
+        exit 1
+    fi
     git push origin "$TAG"
 
     echo ""

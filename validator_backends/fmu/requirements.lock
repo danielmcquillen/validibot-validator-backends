@@ -181,9 +181,9 @@ cryptography==49.0.0 \
 defusedxml==0.7.1 \
     --hash=sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69 \
     --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
-fastjsonschema==2.22.0 \
-    --hash=sha256:60f4c92fda6f93efe3b3261638836478e1e11abc01c647e36e478199f7a86a37 \
-    --hash=sha256:6eb12e8f9900db6166c3d396d178ebdf6a4215fe22a06e19792edd612a20035a
+fastjsonschema==2.22.1 \
+    --hash=sha256:0b83d1ce8d7845b959dcb20e1a5c3c8883b6541d9c52ab02cce5166b75ec805f \
+    --hash=sha256:cf377ff5c9a6f4f3125fb35f75a2c5767bd824ffbcf62c209a93cd48d1453999
 fmpy==0.3.30 \
     --hash=sha256:c2e2e4fb2b78dafcb5c9773f8946fce29f02f5d0f2c61699c249cf0fe8391f93
 google-api-core==2.33.0 \
@@ -587,6 +587,6 @@ typing-inspection==0.4.2 \
 urllib3==2.7.0 \
     --hash=sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c \
     --hash=sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
-validibot-shared==0.21.0 \
-    --hash=sha256:65526b4e39a476e3eb5fc93fb858a3c428a53ffe1899493bbda8a2bf2bd42839 \
-    --hash=sha256:af63ee3b5ae9538ce7dfdd62ce32d2578747ce2329c7fd573663fc9d0c95b5a0
+validibot-shared==0.22.0 \
+    --hash=sha256:484e0aecaba64b6545ed4a18cfc7f598c5b45765e2b733f1623b17584ecd0781 \
+    --hash=sha256:668d25d65cb1899ba1688fb75e9fe5dbceb2d1b164c1f014c98e139f426a5469

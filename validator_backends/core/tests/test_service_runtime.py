@@ -225,9 +225,7 @@ def test_child_timeout_terminates_then_returns_retryable_failure(monkeypatch):
     monkeypatch.setattr("subprocess.Popen", lambda *_args, **_kwargs: _Process())
     monkeypatch.setattr(
         "os.killpg",
-        lambda process_group, sent_signal: received_signals.append(
-            (process_group, sent_signal)
-        ),
+        lambda process_group, sent_signal: received_signals.append((process_group, sent_signal)),
     )
     request = ServiceExecutionRequest.model_validate(_payload())
 
@@ -256,9 +254,7 @@ def test_child_timeout_escalates_the_process_group_to_sigkill(monkeypatch):
     monkeypatch.setattr("subprocess.Popen", lambda *_args, **_kwargs: _Process())
     monkeypatch.setattr(
         "os.killpg",
-        lambda process_group, sent_signal: received_signals.append(
-            (process_group, sent_signal)
-        ),
+        lambda process_group, sent_signal: received_signals.append((process_group, sent_signal)),
     )
     request = ServiceExecutionRequest.model_validate(_payload())
 

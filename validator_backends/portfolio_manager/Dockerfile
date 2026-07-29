@@ -5,7 +5,7 @@ FROM python:3.13-slim@sha256:6771159cd4fa5d9bba1258caf0b82e6b73458c694d178ad97c5
 # Every build passes this backend's release_version from backends.toml.
 ARG VALIDATOR_BACKEND_VERSION
 ARG VALIDATOR_BACKEND_REVISION="unknown"
-ARG VALIDATOR_BACKEND_SOURCE="https://github.com/danielmcquillen/validibot-validator-backends"
+ARG VALIDATOR_BACKEND_SOURCE="https://github.com/mcquilleninteractive/validibot-validator-backends"
 ARG VALIDATOR_BACKEND_SLUG="portfolio_manager"
 
 LABEL org.opencontainers.image.title="Validibot building benchmark report validator backend" \
