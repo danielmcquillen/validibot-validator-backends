@@ -1147,7 +1147,7 @@ wheels = [
 
 [[package]]
 name = "pyshacl"
-version = "0.40.0"
+version = "0.40.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "owlrl" },
@@ -1155,9 +1155,9 @@ dependencies = [
     { name = "prettytable" },
     { name = "rdflib", extra = ["html"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e7/e1/5b40a19ad81721c700916be68456ccd37e17784f85fded7a5b0e668e2b71/pyshacl-0.40.0.tar.gz", hash = "sha256:d9cd86f108266a157162afb69a106689c868388e5d7be80c1fcf16070cf6ad08", size = 1442070, upload-time = "2026-07-08T09:05:47.215Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/b8/f92465fead905b7c5365631a3997107c896cf1e32f4f9a163bdaee54e4fb/pyshacl-0.40.1.tar.gz", hash = "sha256:011e3cf1a68b31747cb762ba3d755ae1bdcc464c8fad0dc212a9adc550719552", size = 1444205, upload-time = "2026-07-28T01:37:36.499Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d3/d4/03665816f1c8fbba4c45576e7845028b1902d7cd433a40df51b4ec6b0a9f/pyshacl-0.40.0-py3-none-any.whl", hash = "sha256:1f814baa7fc2b877c999819fed9e4b8e4ba2461bc00ed8ed3e8bb4346258500f", size = 1306189, upload-time = "2026-07-08T09:05:44.431Z" },
+    { url = "https://files.pythonhosted.org/packages/03/90/7f35a79db93032ef20db5b740062b54afba32a2c2475a6f0a43c141a69de/pyshacl-0.40.1-py3-none-any.whl", hash = "sha256:27dd58c8ddfa103303b4a8c40b2c666332ffc912dbcd3137f7adc7b7bc5e6bda", size = 1306209, upload-time = "2026-07-28T01:37:34.298Z" },
 ]
 
 [[package]]
@@ -1498,7 +1498,7 @@ requires-dist = [
     { name = "openpyxl", marker = "extra == 'portfolio-manager'", specifier = "==3.1.5" },
     { name = "owlrl", marker = "extra == 'shacl'", specifier = "==7.6.2" },
     { name = "pydantic", specifier = "==2.13.4" },
-    { name = "pyshacl", marker = "extra == 'shacl'", specifier = "==0.40.0" },
+    { name = "pyshacl", marker = "extra == 'shacl'", specifier = "==0.40.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==9.1.1" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = "==7.1.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = "==3.15.1" },

@@ -13,7 +13,7 @@ defusedxml==0.7.1
 
 # RDF / SHACL stack (matches validibot community pins).
 rdflib==7.6.0
-pyshacl==0.40.0
+pyshacl==0.40.1
 owlrl==7.6.2
 # lxml: pin a version at or above the 6.1.0 CVE-2026-41066 XXE fix. It is not
 # on the SHACL critical path: rdflib uses its own SAX parser and we layer
