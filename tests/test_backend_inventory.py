@@ -26,6 +26,8 @@ from scripts.backend_inventory import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPO_ROOT / "backends.toml"
 JUSTFILE_PATH = REPO_ROOT / "justfile"
+CI_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+RELEASE_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "release.yml"
 
 
 def _manifest() -> dict:
@@ -81,7 +83,7 @@ def test_manifest_schema_and_paths_are_valid():
 def test_release_and_developer_builds_are_inventory_driven():
     """Release and local build paths must work on case-sensitive Linux hosts."""
     release_slugs = [backend["slug"] for backend in _backends() if backend.get("release") is True]
-    release_yml = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    release_yml = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
     justfile = JUSTFILE_PATH.read_text(encoding="utf-8")
 
     assert _justfile_slugs() == release_slugs
@@ -91,11 +93,54 @@ def test_release_and_developer_builds_are_inventory_driven():
     assert "VALIDATOR_BACKEND_VERSION=${{" in release_yml
     assert 'scripts/backend_inventory.py field "{{validator}}" release_version' in justfile
     assert '--build-arg VALIDATOR_BACKEND_VERSION="$BACKEND_VERSION"' in justfile
+    assert 'verify-tag "$TAG"' in justfile
+    assert "git push origin" in justfile
+    assert justfile.index('verify-tag "$TAG"') < justfile.index('git push origin "$TAG"')
+
+
+def test_release_workflow_uses_protected_main_as_its_trust_anchor():
+    """A signed tag must not be allowed to smuggle in its own trusted key."""
+    release_yml = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "workflow_dispatch:" not in release_yml
+    assert "origin/main:.allowed_signers" in release_yml
+    assert "git merge-base --is-ancestor" in release_yml
+    assert "TAG_COMMIT" in release_yml
+    assert "CHECKOUT_COMMIT" in release_yml
+    assert "source_commit: ${{ steps.identity.outputs.source_commit }}" in release_yml
+    assert "VALIDATOR_BACKEND_REVISION=${{ needs.select-release.outputs.source_commit }}" in (
+        release_yml
+    )
+
+
+def test_release_workflow_is_immutable_and_attests_both_sboms():
+    """Published image tags, releases, and SBOM claims must be tamper-evident."""
+    release_yml = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "name: ghcr" in release_yml
+    assert "Refuse to overwrite a published release" in release_yml
+    assert "docker buildx imagetools inspect" in release_yml
+    assert "--clobber" not in release_yml
+    assert release_yml.count("uses: actions/attest@") == 2
+    assert release_yml.count("sbom-path:") == 2
+    assert release_yml.count("push-to-registry: true") == 3
+
+
+def test_ci_exposes_one_aggregate_branch_protection_check():
+    """Branch protection must depend on every security and test job together."""
+    ci_yml = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert re.search(r"(?m)^  ci:\n    name: ci$", ci_yml)
+    assert "needs: [security, test]" in ci_yml
+    assert 'test "$SECURITY_RESULT" = "success"' in ci_yml
+    assert 'test "$TEST_RESULT" = "success"' in ci_yml
+    assert "ruff format --check ." in ci_yml
+    assert "--require-hashes" in ci_yml
 
 
 def test_release_json_contains_only_the_public_adr_fields():
     """Application SBOMs may be attached separately but not alter release JSON."""
-    release_yml = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    release_yml = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
     record_expression = release_yml.split(
         "--arg schema_version",
         maxsplit=1,
@@ -163,8 +208,8 @@ def test_provider_resource_names_are_unique_bounded_and_release_specific():
 
     assert len(names) == len(validated) * 2 * 2
     assert all(len(name) <= 63 for name in names)
-    assert "vb-vs-energyplus-v0-15-2" in names
-    assert "vb-vj-portfolio-manager-v0-16-2-stg" in names
+    assert "vb-vs-energyplus-v0-15-3" in names
+    assert "vb-vj-portfolio-manager-v0-16-3-stg" in names
 
 
 def test_duplicate_provider_slug_is_rejected():

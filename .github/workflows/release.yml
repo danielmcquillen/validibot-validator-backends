@@ -4,30 +4,34 @@
 # entry in ``backends.toml`` is release-enabled and its ``release_version`` is
 # exactly ``0.17.0``. The selected image is built once, by digest, and the
 # workflow publishes its SBOM plus one attested backend release JSON record.
+#
+# Trust boundary: release tags are verified against ``.allowed_signers`` loaded
+# from protected ``main``, never from the tag being verified. The tag commit
+# must also be the checked-out commit and an ancestor of protected ``main``.
 
 name: Release validator backend image
 
 on:
   push:
     tags: ["*-v*"]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Existing signed backend tag (for example energyplus-v0.17.0)"
-        required: true
-        type: string
 
 permissions:
   contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   select-release:
     name: Verify backend release identity
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       backend: ${{ steps.inventory.outputs.backend }}
       version: ${{ steps.inventory.outputs.version }}
       source_tag: ${{ steps.inventory.outputs.source_tag }}
+      source_commit: ${{ steps.identity.outputs.source_commit }}
       dockerfile: ${{ steps.inventory.outputs.dockerfile }}
       requirements: ${{ steps.inventory.outputs.requirements }}
       requirements_lock: ${{ steps.inventory.outputs.requirements_lock }}
@@ -44,30 +48,45 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+          ref: ${{ github.ref }}
 
-      - name: Configure SSH tag verification
+      - name: Verify tag against protected-main trust anchor
+        id: identity
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          test -f .allowed_signers || {
-            echo "::error::Repo is missing .allowed_signers."
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          git show origin/main:.allowed_signers \
+            > "$RUNNER_TEMP/validibot-allowed-signers"
+          test -s "$RUNNER_TEMP/validibot-allowed-signers" || {
+            echo "::error::Protected main is missing .allowed_signers."
             exit 1
           }
-          git config gpg.ssh.allowedSignersFile "$PWD/.allowed_signers"
+          git config gpg.ssh.allowedSignersFile \
+            "$RUNNER_TEMP/validibot-allowed-signers"
           git config gpg.format ssh
 
-      - name: Verify signed tag
-        env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
           if ! git verify-tag "$RELEASE_TAG"; then
             echo "::error::Tag '$RELEASE_TAG' is not signed by an allowed key."
             exit 1
           fi
+          TAG_COMMIT="$(git rev-parse "${RELEASE_TAG}^{commit}")"
+          CHECKOUT_COMMIT="$(git rev-parse HEAD)"
+          if [[ "$TAG_COMMIT" != "$CHECKOUT_COMMIT" ]]; then
+            echo "::error::Tag commit does not match the checked-out commit."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" origin/main; then
+            echo "::error::Tag commit is not on protected main."
+            exit 1
+          fi
+          echo "source_commit=$TAG_COMMIT" >> "$GITHUB_OUTPUT"
 
       - name: Validate inventory and select one backend
         id: inventory
         env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python3 scripts/backend_inventory.py validate >/dev/null
           python3 scripts/backend_inventory.py release "$RELEASE_TAG" \
@@ -77,11 +96,13 @@ jobs:
     name: Test ${{ needs.select-release.outputs.backend }}
     needs: select-release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+          ref: ${{ github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -114,6 +135,9 @@ jobs:
     name: Publish ${{ needs.select-release.outputs.backend }} v${{ needs.select-release.outputs.version }}
     needs: [select-release, test-selected-backend]
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: ghcr
     permissions:
       id-token: write
       attestations: write
@@ -124,7 +148,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+          ref: ${{ github.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -151,6 +176,23 @@ jobs:
             echo "version_ref=${IMAGE}:v${VERSION}"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Refuse to overwrite a published release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.select-release.outputs.source_tag }}
+          VERSION_REF: ${{ steps.image.outputs.version_ref }}
+        run: |
+          if gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::GitHub Release '$RELEASE_TAG' already exists."
+            exit 1
+          fi
+          if docker buildx imagetools inspect "$VERSION_REF" \
+            >/dev/null 2>&1; then
+            echo "::error::Container tag '$VERSION_REF' already exists."
+            exit 1
+          fi
+
       - name: Build and push selected image
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -164,7 +206,7 @@ jobs:
             ${{ steps.image.outputs.name }}:latest
           build-args: |
             VALIDATOR_BACKEND_VERSION=${{ needs.select-release.outputs.version }}
-            VALIDATOR_BACKEND_REVISION=${{ github.sha }}
+            VALIDATOR_BACKEND_REVISION=${{ needs.select-release.outputs.source_commit }}
             VALIDATOR_BACKEND_SOURCE=https://github.com/${{ github.repository }}
             VALIDATOR_BACKEND_SLUG=${{ needs.select-release.outputs.backend }}
           provenance: mode=max
@@ -186,12 +228,28 @@ jobs:
           output-file: ${{ needs.select-release.outputs.sbom }}
           upload-artifact: false
 
+      - name: Attest image SBOM
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: ${{ needs.select-release.outputs.sbom }}
+          push-to-registry: true
+
+      - name: Attest application dependency SBOM
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: ${{ needs.select-release.outputs.application_sbom }}
+          push-to-registry: true
+
       - name: Generate backend release JSON
         env:
           BACKEND: ${{ needs.select-release.outputs.backend }}
           VERSION: ${{ needs.select-release.outputs.version }}
           SOURCE_TAG: ${{ needs.select-release.outputs.source_tag }}
-          SOURCE_COMMIT: ${{ github.sha }}
+          SOURCE_COMMIT: ${{ needs.select-release.outputs.source_commit }}
           IMAGE: ${{ steps.image.outputs.name }}
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
           SHARED_CONTRACT: ${{ needs.select-release.outputs.shared_contract }}
@@ -242,24 +300,18 @@ jobs:
 
       - name: Create backend-specific GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.select-release.outputs.source_tag }}
           SBOM: ${{ needs.select-release.outputs.sbom }}
           APPLICATION_SBOM: ${{ needs.select-release.outputs.application_sbom }}
           RELEASE_RECORD: ${{ needs.select-release.outputs.release_record }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! gh release view "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "$RELEASE_TAG" \
-              --generate-notes \
-              --verify-tag
-          fi
-          gh release upload "$RELEASE_TAG" \
+          gh release create "$RELEASE_TAG" \
             "$SBOM" \
             "$APPLICATION_SBOM" \
             "$RELEASE_RECORD" \
             "${RELEASE_RECORD}.sha256" \
             --repo "$GITHUB_REPOSITORY" \
-            --clobber
+            --title "$RELEASE_TAG" \
+            --generate-notes \
+            --verify-tag

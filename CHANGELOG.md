@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Backend releases: EnergyPlus/FMU/SHACL/Schematron 0.15.3; Portfolio Manager 0.16.3 - 2026-07-29
+
+### Changed
+
+- Move source, release, and container provenance identities to the
+  `mcquilleninteractive` GitHub organization.
+- Upgrade every backend image to `validibot-shared==0.22.0`.
+
+### Security
+
+- Verify signed release tags against `.allowed_signers` from protected `main`
+  and require every tag commit to be the checked-out protected-main commit.
+- Publish only from a tag-restricted `ghcr` environment, reject release and
+  version-tag overwrites, and bind both image-level and application-level
+  SBOMs to the exact container digest with signed attestations.
+- Add an aggregate required `ci` check, deterministic lockfile vulnerability
+  audits, and formatting enforcement.
+
 ## Backend releases: EnergyPlus/FMU/SHACL/Schematron 0.15.2; Portfolio Manager 0.16.2 - 2026-07-27
 
 ### Fixed

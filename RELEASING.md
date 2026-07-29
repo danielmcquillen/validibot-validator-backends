@@ -12,20 +12,20 @@ Validator backend container images are published to **GitHub
 Container Registry (GHCR)** at:
 
 ```
-ghcr.io/danielmcquillen/validibot-validator-backend-<validator>:<tag>
+ghcr.io/mcquilleninteractive/validibot-validator-backend-<validator>:<tag>
 ```
 
-GHCR is free for public images, has no rate limit on anonymous
-pulls, and authenticates via standard Docker tooling. No GCP, AWS,
-or third-party registry credentials required.
+These images are public and can be pulled without credentials, subject to
+GHCR's service limits. No GCP, AWS, or third-party registry credentials are
+required.
 
 Available backends today:
 
-- `ghcr.io/danielmcquillen/validibot-validator-backend-energyplus`
-- `ghcr.io/danielmcquillen/validibot-validator-backend-fmu`
-- `ghcr.io/danielmcquillen/validibot-validator-backend-shacl`
-- `ghcr.io/danielmcquillen/validibot-validator-backend-schematron`
-- `ghcr.io/danielmcquillen/validibot-validator-backend-portfolio-manager`
+- `ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus`
+- `ghcr.io/mcquilleninteractive/validibot-validator-backend-fmu`
+- `ghcr.io/mcquilleninteractive/validibot-validator-backend-shacl`
+- `ghcr.io/mcquilleninteractive/validibot-validator-backend-schematron`
+- `ghcr.io/mcquilleninteractive/validibot-validator-backend-portfolio-manager`
 
 Each release publishes both `:vX.Y.Z` (immutable, recommended for
 production) and `:latest` (mutable convenience pointer for
@@ -60,11 +60,11 @@ A fresh release ships these values:
 
 | Backend | Wrapper version | Bundled library |
 |---|---|---|
-| EnergyPlus | `0.15.2` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
-| FMU | `0.15.2` (`backends.toml`) | FMPy 0.3.30 |
-| SHACL | `0.15.2` (`backends.toml`) | pySHACL 0.40.0 |
-| Schematron | `0.15.2` (`backends.toml`) | SaxonC-HE 13.0.0 |
-| Portfolio Manager | `0.16.2` (`backends.toml`) | openpyxl 3.1.5 and xlrd 2.0.2 |
+| EnergyPlus | `0.15.3` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
+| FMU | `0.15.3` (`backends.toml`) | FMPy 0.3.30 |
+| SHACL | `0.15.3` (`backends.toml`) | pySHACL 0.40.0 |
+| Schematron | `0.15.3` (`backends.toml`) | SaxonC-HE 13.0.0 |
+| Portfolio Manager | `0.16.3` (`backends.toml`) | openpyxl 3.1.5 and xlrd 2.0.2 |
 
 Bumping the wrapper version does NOT imply bumping the bundled library,
 and vice versa. They iterate independently.
@@ -76,11 +76,11 @@ Edit only the backend's `release_version` in `backends.toml`:
 ```toml
 [[backend]]
 slug = "fmu"
-release_version = "0.15.2"
+release_version = "0.15.3"
 ```
 
-The next `just build fmu` stamps `0.15.2`. A signed
-`fmu-v0.15.2` tag tests and publishes only FMU; it does not build another
+The next `just build fmu` stamps `0.15.3`. A signed
+`fmu-v0.15.3` tag tests and publishes only FMU; it does not build another
 backend.
 
 Tags are immutable release attempts. If CI fails after a tag is pushed, leave
@@ -122,17 +122,18 @@ label is for inventory and support readability.
 Each release ships:
 
 1. **A signed git tag** on the `validibot-validator-backends`
-   repo, verifiable via `git verify-tag` against the repo's
-   `.allowed_signers`.
+   repo, verifiable via `git verify-tag` against the `.allowed_signers`
+   trust anchor stored on protected `main`. Release CI also requires the tag
+   commit to be the checked-out commit and an ancestor of protected `main`.
 2. **A sigstore build-provenance attestation** on the image
    digest, verifiable via `gh attestation verify`. This is what
    the runtime
    `VALIDATOR_BACKEND_IMAGE_POLICY=signed-digest` setting
    consumes when enabled.
 
-The two layers stack: the signed git tag gates the CI run that
-produces the image attestation, so a verified attestation
-implicitly verifies the source commit.
+The layers stack: the signed git tag gates the CI run that produces the image
+attestations, so a verified attestation also identifies the protected-main
+source commit. The tag does not supply its own trust anchor.
 
 ## Verifying a release before deploy
 
@@ -140,19 +141,19 @@ implicitly verifies the source commit.
 # Pull the image. For production, prefer pinning by digest rather
 # than tag — operators running with VALIDATOR_BACKEND_IMAGE_POLICY=digest
 # require this anyway.
-docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2
+docker pull ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.3
 
 # Resolve the digest:
 DIGEST=$(crane digest \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2)
+  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.3)
 echo "Image digest: $DIGEST"
 
 # Verify the sigstore attestation against the digest. This
 # confirms the image was built by Validibot's GitHub Actions on
 # the expected commit, signed via OIDC.
 gh attestation verify \
-  "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus@$DIGEST" \
-  --owner danielmcquillen
+  "oci://ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus@$DIGEST" \
+  --owner mcquilleninteractive
 # Expected output: "Verification succeeded!"
 ```
 
@@ -160,7 +161,7 @@ gh attestation verify \
 
 - A sigstore attestation exists for the digest.
 - The attestation was signed via OIDC by
-  `danielmcquillen/validibot-validator-backends`'s GitHub Actions
+  `mcquilleninteractive/validibot-validator-backends`'s GitHub Actions
   identity.
 - The attestation chain validates against the sigstore root.
 
@@ -177,7 +178,7 @@ policy.
 # docker-compose.yml or deployment manifest
 services:
   validator-energyplus:
-    image: ghcr.io/danielmcquillen/validibot-validator-backend-energyplus@sha256:abc123...
+    image: ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus@sha256:abc123...
 ```
 
 Pin by digest in production. The version-tag form is convenient
@@ -195,8 +196,8 @@ billing), mirror the digest to your registry:
 brew install crane   # or download from go-containerregistry releases
 
 crane copy \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2 \
-  111122223333.dkr.ecr.us-west-2.amazonaws.com/validibot-validator-backend-energyplus:v0.15.2
+  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.3 \
+  111122223333.dkr.ecr.us-west-2.amazonaws.com/validibot-validator-backend-energyplus:v0.15.3
 ```
 
 The image digest is preserved across the copy, so
@@ -208,16 +209,16 @@ name.
 
 ```bash
 # On an internet-connected transit host:
-docker pull ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2
+docker pull ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.3
 gh attestation verify \
-  "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2" \
-  --owner danielmcquillen
-docker save -o energyplus-v0.15.2.tar \
-  ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2
+  "oci://ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.3" \
+  --owner mcquilleninteractive
+docker save -o energyplus-v0.15.3.tar \
+  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.3
 
 # Transfer the tarball through your air-gap process. On the
 # air-gapped host:
-docker load -i energyplus-v0.15.2.tar
+docker load -i energyplus-v0.15.3.tar
 ```
 
 Verification happens at the network boundary (the transit host),
@@ -240,11 +241,11 @@ For each backend, every signed-tag release publishes:
 5. **A SPDX image SBOM** embedded in the OCI image manifest, queryable
    via `docker buildx imagetools inspect <ref> --format '{{ json .SBOM }}'`.
 6. **A standalone image SBOM artifact** attached to the GitHub release
-   page (`validibot-validator-backend-<validator>.spdx.json`) for
-   tools that prefer fetching SBOMs from a release page rather
-   than from the registry.
+   page (`validibot-validator-backend-<validator>.spdx.json`) and bound to the
+   exact image digest by a signed SBOM attestation.
 7. **A lock-derived CycloneDX application SBOM** embedded at
-   `/app/legal/APPLICATION-SBOM.cdx.json` and attached to the GitHub release.
+   `/app/legal/APPLICATION-SBOM.cdx.json`, attached to the GitHub release, and
+   bound to the exact image digest by a signed SBOM attestation.
    The image also contains `LICENSE`, `NOTICE`, the generated
    `THIRD-PARTY-LICENSES.md`, and copied wheel license files under `/app/legal`.
 8. **An attested backend release JSON** named
@@ -269,10 +270,10 @@ add an attestation-verify step before deploy:
 - name: Verify validator backend image
   run: |
     DIGEST=$(crane digest \
-      ghcr.io/danielmcquillen/validibot-validator-backend-energyplus:v0.15.2)
+      ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.3)
     gh attestation verify \
-      "oci://ghcr.io/danielmcquillen/validibot-validator-backend-energyplus@$DIGEST" \
-      --owner danielmcquillen
+      "oci://ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus@$DIGEST" \
+      --owner mcquilleninteractive
   env:
     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```

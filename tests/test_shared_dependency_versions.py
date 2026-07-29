@@ -60,11 +60,7 @@ def test_root_shared_dependency_resolves_from_pypi() -> None:
     """Local and CI tests must consume the same published contract as images."""
     project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     lock = tomllib.loads((REPO_ROOT / "uv.lock").read_text(encoding="utf-8"))
-    matches = [
-        package
-        for package in lock["package"]
-        if package["name"] == "validibot-shared"
-    ]
+    matches = [package for package in lock["package"] if package["name"] == "validibot-shared"]
 
     assert "validibot-shared" not in project.get("tool", {}).get("uv", {}).get(
         "sources",

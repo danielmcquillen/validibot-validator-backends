@@ -42,7 +42,7 @@ dependencies = [
     "google-auth==2.56.2",
     "requests==2.34.2",
     "sentry-sdk==2.66.1",
-    "validibot-shared==0.21.0",
+    "validibot-shared==0.22.0",
 ]
 
 [project.optional-dependencies]
@@ -92,8 +92,8 @@ portfolio_manager = [
 [project.urls]
 Homepage = "https://validibot.com"
 Documentation = "https://docs.validibot.com"
-Repository = "https://github.com/danielmcquillen/validibot-validator-backends"
-Issues = "https://github.com/danielmcquillen/validibot-validator-backends/issues"
+Repository = "https://github.com/mcquilleninteractive/validibot-validator-backends"
+Issues = "https://github.com/mcquilleninteractive/validibot-validator-backends/issues"
 
 # ==== Build system ====
 
@@ -106,6 +106,11 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["validator_backends"]
+
+# fastjsonschema 2.22.0 was yanked for invalid Python-version metadata.
+# Keep FMPy's nbformat dependency on a non-yanked compatible release.
+[tool.uv]
+constraint-dependencies = ["fastjsonschema!=2.22.0"]
 
 # ==== pytest ====
 

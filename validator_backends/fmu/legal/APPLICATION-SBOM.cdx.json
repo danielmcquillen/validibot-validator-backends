@@ -71,11 +71,11 @@
       "version": "0.7.1"
     },
     {
-      "bom-ref": "fastjsonschema-11@2.22.0",
+      "bom-ref": "fastjsonschema-11@2.22.1",
       "name": "fastjsonschema",
-      "purl": "pkg:pypi/fastjsonschema@2.22.0",
+      "purl": "pkg:pypi/fastjsonschema@2.22.1",
       "type": "library",
-      "version": "2.22.0"
+      "version": "2.22.1"
     },
     {
       "bom-ref": "fmpy-12@0.3.30",
@@ -350,11 +350,11 @@
       "version": "2.7.0"
     },
     {
-      "bom-ref": "validibot-shared-50@0.21.0",
+      "bom-ref": "validibot-shared-50@0.22.0",
       "name": "validibot-shared",
-      "purl": "pkg:pypi/validibot-shared@0.21.0",
+      "purl": "pkg:pypi/validibot-shared@0.22.0",
       "type": "library",
-      "version": "0.21.0"
+      "version": "0.22.0"
     }
   ],
   "dependencies": [
@@ -395,7 +395,7 @@
       "ref": "defusedxml-10@0.7.1"
     },
     {
-      "ref": "fastjsonschema-11@2.22.0"
+      "ref": "fastjsonschema-11@2.22.1"
     },
     {
       "dependsOn": [
@@ -524,7 +524,7 @@
     },
     {
       "dependsOn": [
-        "fastjsonschema-11@2.22.0",
+        "fastjsonschema-11@2.22.1",
         "jsonschema-25@4.26.0",
         "jupyter-core-27@5.9.1",
         "traitlets-46@5.15.1"
@@ -619,12 +619,12 @@
         "defusedxml-10@0.7.1",
         "pydantic-40@2.13.4"
       ],
-      "ref": "validibot-shared-50@0.21.0"
+      "ref": "validibot-shared-50@0.22.0"
     }
   ],
   "metadata": {
     "component": {
-      "bom-ref": "validibot-validator-backend-fmu@0.15.2",
+      "bom-ref": "validibot-validator-backend-fmu@0.15.3",
       "name": "validibot-validator-backend-fmu",
       "properties": [
         {
@@ -633,11 +633,11 @@
         },
         {
           "name": "io.validibot.shared-contract.version",
-          "value": "0.21.0"
+          "value": "0.22.0"
         }
       ],
       "type": "application",
-      "version": "0.15.2"
+      "version": "0.15.3"
     },
     "tools": [
       {
@@ -647,7 +647,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:873f4565-2877-573f-851c-55b90d331f61",
+  "serialNumber": "urn:uuid:e3b165d9-76cc-55a4-b13e-480588051583",
   "specVersion": "1.5",
   "version": 1
 }
