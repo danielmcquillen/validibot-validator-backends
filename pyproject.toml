@@ -69,7 +69,7 @@ fmu = [
 # community validibot repo so behaviour is identical across the boundary.
 shacl = [
     "rdflib==7.6.0",
-    "pyshacl==0.40.0",
+    "pyshacl==0.40.1",
     "owlrl==7.6.2",
     "defusedxml==0.7.1",
     "lxml==6.1.1",
