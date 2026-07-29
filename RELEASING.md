@@ -62,7 +62,7 @@ A fresh release ships these values:
 |---|---|---|
 | EnergyPlus | `0.15.3` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
 | FMU | `0.15.3` (`backends.toml`) | FMPy 0.3.30 |
-| SHACL | `0.15.3` (`backends.toml`) | pySHACL 0.40.0 |
+| SHACL | `0.15.3` (`backends.toml`) | pySHACL 0.40.1 |
 | Schematron | `0.15.3` (`backends.toml`) | SaxonC-HE 13.0.0 |
 | Portfolio Manager | `0.16.3` (`backends.toml`) | openpyxl 3.1.5 and xlrd 2.0.2 |
 
