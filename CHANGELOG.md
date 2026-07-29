@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Advance the EnergyPlus backend to `0.15.4` for its first publication after
+  enabling GitHub immutable releases.
+
 ## Backend releases: EnergyPlus/FMU/SHACL/Schematron 0.15.3; Portfolio Manager 0.16.3 - 2026-07-29
 
 ### Changed
