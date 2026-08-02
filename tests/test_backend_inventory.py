@@ -2,8 +2,9 @@
 
 Schema 2 makes ``backends.toml`` the only list of release-enabled backends,
 their build inputs, and the version offered to setup/update. These tests prove
-that local builds and the one-backend release workflow consume those values
-instead of keeping handwritten release matrices or Dockerfile defaults.
+that local builds and the single- and multi-backend release workflows consume
+those values instead of keeping handwritten release matrices or Dockerfile
+defaults.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from scripts.backend_inventory import (
     parse_release_tag,
     provider_resource_name,
     release_output,
+    release_tags,
     validate_inventory,
 )
 
@@ -81,7 +83,7 @@ def test_manifest_schema_and_paths_are_valid():
 
 
 def test_release_and_developer_builds_are_inventory_driven():
-    """Release and local build paths must work on case-sensitive Linux hosts."""
+    """Single, batch, and local build paths must use the same inventory."""
     release_slugs = [backend["slug"] for backend in _backends() if backend.get("release") is True]
     release_yml = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
     justfile = JUSTFILE_PATH.read_text(encoding="utf-8")
@@ -96,6 +98,9 @@ def test_release_and_developer_builds_are_inventory_driven():
     assert 'verify-tag "$TAG"' in justfile
     assert "git push origin" in justfile
     assert justfile.index('verify-tag "$TAG"') < justfile.index('git push origin "$TAG"')
+    assert "release-all:" in justfile
+    assert "scripts/backend_inventory.py release-tags" in justfile
+    assert 'git push --atomic origin "${TAGS[@]}"' in justfile
 
 
 def test_release_workflow_uses_protected_main_as_its_trust_anchor():
@@ -194,6 +199,17 @@ def test_backend_specific_tags_select_only_the_named_inventory_entry():
         parse_release_tag("energyplus-v99.0.0")
     with pytest.raises(InventoryError, match="release tag must"):
         parse_release_tag("v0.16.0")
+
+
+def test_batch_release_tags_follow_the_release_enabled_inventory():
+    """The batch recipe must not maintain a second list of backend versions."""
+    expected = tuple(
+        f"{backend['slug']}-v{backend['release_version']}"
+        for backend in _backends()
+        if backend.get("release") is True
+    )
+
+    assert release_tags() == expected
 
 
 def test_provider_resource_names_are_unique_bounded_and_release_specific():

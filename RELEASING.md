@@ -1,10 +1,44 @@
-# Verifying a validator backend release
+# Releasing and verifying validator backends
 
-This document is for **operators** pulling validator backend
-images and confirming their provenance. The maintainer's release
-recipe (signing keys, GAR mirror setup, etc.) is internal
-documentation; this file covers what you need to know as a
-downstream consumer.
+This document covers the maintainer release commands and the downstream
+operator checks for validator backend images.
+
+## Cut a release
+
+Use the `just` recipes for routine releases. They read versions directly from
+`backends.toml`, require a clean and synchronized `main`, confirm the repository
+uses the latest published `validibot-shared`, run the complete release checks,
+create signed tags, verify them against `.allowed_signers`, and push them.
+
+Release one backend:
+
+```bash
+just release energyplus
+```
+
+Release every backend whose current `backends.toml` version has not yet been
+published:
+
+```bash
+just release-all
+```
+
+`just release-all` shows the exact tags and asks for confirmation once. It
+skips tags already on `origin`, signs the remaining tags, verifies all of them,
+then pushes them atomically. Each tag starts its own backend-specific GitHub
+Actions release. If an atomic push fails after tags were created locally,
+rerunning the same command safely verifies and resumes those local tags.
+
+Before either command, update the relevant `release_version` values and
+generated artifacts, commit the changes, merge them to `main`, and pull the
+updated `main`. Routine releases should not be assembled with a handwritten
+sequence of `git tag` and `git push` commands.
+
+After pushing, monitor the release workflows:
+
+```bash
+gh run watch
+```
 
 ## Where the images live
 
@@ -76,12 +110,13 @@ Edit only the backend's `release_version` in `backends.toml`:
 ```toml
 [[backend]]
 slug = "fmu"
-release_version = "0.15.3"
+release_version = "0.15.5"
 ```
 
-The next `just build fmu` stamps `0.15.3`. A signed
-`fmu-v0.15.3` tag tests and publishes only FMU; it does not build another
-backend.
+The next `just build fmu` stamps `0.15.5`. Once the change is on `main`,
+`just release fmu` signs and publishes `fmu-v0.15.5`; it does not build another
+backend. Use `just release-all` when versions for several backends changed in
+the same commit.
 
 Tags are immutable release attempts. If CI fails after a tag is pushed, leave
 that tag in place, fix the source, increment that backend's version, and create
