@@ -533,6 +533,16 @@ release-all:
     TAGS=()
     NEW_TAGS=()
     RETRY_TAGS=()
+
+    is_retry_tag() {
+        local CANDIDATE="$1"
+        local RETRY_TAG
+        for RETRY_TAG in "${RETRY_TAGS[@]+"${RETRY_TAGS[@]}"}"; do
+            [[ "$CANDIDATE" == "$RETRY_TAG" ]] && return 0
+        done
+        return 1
+    }
+
     while IFS= read -r TAG; do
         [[ -n "$TAG" ]] || continue
         python3 scripts/backend_inventory.py release "$TAG" >/dev/null
@@ -599,7 +609,7 @@ release-all:
     echo ""
     echo "About to publish these backend releases one at a time:"
     for TAG in "${TAGS[@]}"; do
-        if [[ " ${RETRY_TAGS[*]} " == *" $TAG "* ]]; then
+        if is_retry_tag "$TAG"; then
             echo "  - $TAG (retry unchanged signed tag)"
         else
             echo "  - $TAG (new signed tag)"
@@ -608,7 +618,7 @@ release-all:
     echo "Press Enter to continue, Ctrl+C to abort..."
     read -r
 
-    for TAG in "${NEW_TAGS[@]}"; do
+    for TAG in "${NEW_TAGS[@]+"${NEW_TAGS[@]}"}"; do
         git tag -s "$TAG" -m "$TAG"
     done
 
@@ -620,7 +630,7 @@ release-all:
             echo "✗ Local verification failed for $TAG; no tags were pushed."
             exit 1
         fi
-        if [[ " ${RETRY_TAGS[*]} " == *" $TAG "* ]]; then
+        if is_retry_tag "$TAG"; then
             if ! git merge-base --is-ancestor "${TAG}^{commit}" HEAD; then
                 echo "✗ $TAG is not on current main; no tags were pushed."
                 exit 1
@@ -634,7 +644,7 @@ release-all:
     done
 
     for TAG in "${TAGS[@]}"; do
-        if [[ " ${RETRY_TAGS[*]} " == *" $TAG "* ]]; then
+        if is_retry_tag "$TAG"; then
             git push origin ":refs/tags/$TAG"
             if ! git push origin "refs/tags/$TAG:refs/tags/$TAG"; then
                 echo "✗ Could not restore $TAG on origin."

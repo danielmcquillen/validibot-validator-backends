@@ -110,6 +110,16 @@ def test_release_and_developer_builds_are_inventory_driven():
     assert "gh workflow run release.yml" not in justfile
 
 
+def test_release_all_handles_batches_containing_only_retry_tags():
+    """macOS Bash 3.2 must not treat an intentionally empty new-tag array as unset."""
+    justfile = JUSTFILE_PATH.read_text(encoding="utf-8")
+
+    assert 'for TAG in "${NEW_TAGS[@]+"${NEW_TAGS[@]}"}"; do' in justfile
+    assert 'for TAG in "${NEW_TAGS[@]}"; do' not in justfile
+    assert 'for RETRY_TAG in "${RETRY_TAGS[@]+"${RETRY_TAGS[@]}"}"; do' in justfile
+    assert '[[ " ${RETRY_TAGS[*]} "' not in justfile
+
+
 def test_release_workflow_uses_protected_main_as_its_trust_anchor():
     """A signed tag must not be allowed to smuggle in its own trusted key."""
     release_yml = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
