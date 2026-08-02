@@ -35,10 +35,12 @@ verifies and resumes them.
 If a signed tag reached GitHub but no release was produced, the same command
 retries it without changing its version, source commit, signature, or tag
 object. It verifies that the local and remote signed tag objects are identical,
-briefly removes the unpublished remote reference, and immediately pushes that
-exact reference again so GitHub emits the missing tag event. Published releases
-are skipped, and the workflow independently refuses to overwrite either an
-existing GitHub Release or versioned container image.
+then dispatches the release workflow from protected `main` with that tag as its
+verified input. Published releases are skipped, and the workflow independently
+refuses to overwrite either an existing GitHub Release or versioned container
+image. The repository's `ghcr` environment must allow both release tags and
+protected `main`; the workflow still checks the target tag's trusted signature
+and protected-main ancestry before publishing.
 
 Before either command, update the relevant `release_version` values and
 generated artifacts, commit the changes, merge them to `main`, and pull the

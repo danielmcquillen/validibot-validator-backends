@@ -518,8 +518,8 @@ release BACKEND:
 
 # Publish every current inventory tag that does not yet have a GitHub Release.
 # GitHub suppresses workflow events when more than three tags share one push.
-# Existing unpublished tags are verified, briefly removed from origin, and
-# immediately re-pushed as the exact same signed tag object to retry the event.
+# Existing unpublished tags remain immutable and are retried by dispatching the
+# release workflow on protected main with the verified tag as its input.
 # Usage: just release-all
 release-all:
     #!/usr/bin/env bash
@@ -645,13 +645,10 @@ release-all:
 
     for TAG in "${TAGS[@]}"; do
         if is_retry_tag "$TAG"; then
-            git push origin ":refs/tags/$TAG"
-            if ! git push origin "refs/tags/$TAG:refs/tags/$TAG"; then
-                echo "✗ Could not restore $TAG on origin."
-                echo "  The verified signed tag remains local. Restore it with:"
-                echo "  git push origin refs/tags/$TAG:refs/tags/$TAG"
-                exit 1
-            fi
+            gh workflow run release.yml \
+                --repo "$REPO" \
+                --ref main \
+                --raw-field "tag=$TAG"
         else
             git push origin "$TAG"
         fi

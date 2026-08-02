@@ -104,10 +104,10 @@ def test_release_and_developer_builds_are_inventory_driven():
     assert 'gh release view "$TAG"' in justfile
     assert 'LOCAL_TAG_OBJECT="$(git rev-parse "refs/tags/$TAG")"' in justfile
     assert "REMOTE_TAG_OBJECT=\"${REMOTE_TAG%%$'\\t'*}\"" in justfile
-    assert 'git push origin ":refs/tags/$TAG"' in justfile
-    assert 'git push origin "refs/tags/$TAG:refs/tags/$TAG"' in justfile
+    assert 'git push origin ":refs/tags/$TAG"' not in justfile
+    assert 'git push origin "refs/tags/$TAG:refs/tags/$TAG"' not in justfile
     assert "recover-releases:" not in justfile
-    assert "gh workflow run release.yml" not in justfile
+    assert "gh workflow run release.yml" in justfile
 
 
 def test_release_all_handles_batches_containing_only_retry_tags():
@@ -124,11 +124,13 @@ def test_release_workflow_uses_protected_main_as_its_trust_anchor():
     """A signed tag must not be allowed to smuggle in its own trusted key."""
     release_yml = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert "workflow_dispatch:" not in release_yml
-    assert "inputs.tag" not in release_yml
+    assert "workflow_dispatch:" in release_yml
+    assert "Existing signed unpublished backend release tag" in release_yml
+    assert "inputs.tag || github.ref_name" in release_yml
+    assert "inputs.tag || github.ref" in release_yml
     assert 'git check-ref-format "refs/tags/$RELEASE_TAG"' in release_yml
     assert 'git verify-tag -- "$RELEASE_TAG"' in release_yml
-    assert release_yml.count("RELEASE_TAG: ${{ github.ref_name }}") == 2
+    assert release_yml.count("RELEASE_TAG: ${{ inputs.tag || github.ref_name }}") == 2
     assert release_yml.count("ref: ${{ needs.select-release.outputs.source_tag }}") == 2
     assert "origin/main:.allowed_signers" in release_yml
     assert "git merge-base --is-ancestor" in release_yml
