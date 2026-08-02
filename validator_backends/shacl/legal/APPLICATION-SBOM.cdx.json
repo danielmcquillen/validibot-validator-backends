@@ -43,11 +43,11 @@
       "version": "3.4.9"
     },
     {
-      "bom-ref": "cryptography-7@49.0.0",
+      "bom-ref": "cryptography-7@50.0.0",
       "name": "cryptography",
-      "purl": "pkg:pypi/cryptography@49.0.0",
+      "purl": "pkg:pypi/cryptography@50.0.0",
       "type": "library",
-      "version": "49.0.0"
+      "version": "50.0.0"
     },
     {
       "bom-ref": "defusedxml-8@0.7.1",
@@ -280,11 +280,11 @@
       "version": "2.7.0"
     },
     {
-      "bom-ref": "validibot-shared-40@0.22.0",
+      "bom-ref": "validibot-shared-40@0.23.0",
       "name": "validibot-shared",
-      "purl": "pkg:pypi/validibot-shared@0.22.0",
+      "purl": "pkg:pypi/validibot-shared@0.23.0",
       "type": "library",
-      "version": "0.22.0"
+      "version": "0.23.0"
     },
     {
       "bom-ref": "wcwidth-41@0.8.2",
@@ -320,7 +320,7 @@
       "dependsOn": [
         "cffi-5@2.1.0"
       ],
-      "ref": "cryptography-7@49.0.0"
+      "ref": "cryptography-7@50.0.0"
     },
     {
       "ref": "defusedxml-8@0.7.1"
@@ -337,7 +337,7 @@
     },
     {
       "dependsOn": [
-        "cryptography-7@49.0.0",
+        "cryptography-7@50.0.0",
         "pyasn1-modules-28@0.4.2"
       ],
       "ref": "google-auth-10@2.56.2"
@@ -506,7 +506,7 @@
         "defusedxml-8@0.7.1",
         "pydantic-30@2.13.4"
       ],
-      "ref": "validibot-shared-40@0.22.0"
+      "ref": "validibot-shared-40@0.23.0"
     },
     {
       "ref": "wcwidth-41@0.8.2"
@@ -514,7 +514,7 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "validibot-validator-backend-shacl@0.15.3",
+      "bom-ref": "validibot-validator-backend-shacl@0.15.4",
       "name": "validibot-validator-backend-shacl",
       "properties": [
         {
@@ -523,11 +523,11 @@
         },
         {
           "name": "io.validibot.shared-contract.version",
-          "value": "0.22.0"
+          "value": "0.23.0"
         }
       ],
       "type": "application",
-      "version": "0.15.3"
+      "version": "0.15.4"
     },
     "tools": [
       {
@@ -537,7 +537,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:c306b650-cd85-5891-845f-9c3df58dd3c1",
+  "serialNumber": "urn:uuid:955dd0ba-8e28-54dc-831d-fff0746bd836",
   "specVersion": "1.5",
   "version": 1
 }

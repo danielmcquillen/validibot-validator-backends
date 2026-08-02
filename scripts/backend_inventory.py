@@ -232,6 +232,17 @@ def parse_release_tag(
     return backend
 
 
+def release_tags(
+    path: Path = DEFAULT_INVENTORY_PATH,
+) -> tuple[str, ...]:
+    """Return current tags for every release-enabled backend in inventory order."""
+    return tuple(
+        f"{backend.slug}-v{backend.release_version}"
+        for backend in validated_backends(path)
+        if backend.values.get("release") is True
+    )
+
+
 def normalized_provider_version(version: str) -> str:
     """Encode a semantic version without losing pre-release/build boundaries."""
     match = SEMVER_PATTERN.fullmatch(version)
@@ -313,6 +324,8 @@ def _parser() -> argparse.ArgumentParser:
     release_parser.add_argument("tag")
     release_parser.add_argument("--github-output", type=Path)
 
+    subparsers.add_parser("release-tags")
+
     name_parser = subparsers.add_parser("provider-name")
     name_parser.add_argument("kind", choices=("service", "job"))
     name_parser.add_argument("backend")
@@ -353,6 +366,10 @@ def main(argv: list[str] | None = None) -> int:
                     for key, value in output.items():
                         output_file.write(f"{key}={value}\n")
             print(json.dumps(output, sort_keys=True))
+            return 0
+        if args.command == "release-tags":
+            for tag in release_tags(args.inventory):
+                print(tag)
             return 0
         if args.command == "provider-name":
             backend = backend_by_slug(args.backend, path=args.inventory)

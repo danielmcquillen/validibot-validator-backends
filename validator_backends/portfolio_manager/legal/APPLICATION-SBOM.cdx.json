@@ -43,11 +43,11 @@
       "version": "3.4.9"
     },
     {
-      "bom-ref": "cryptography-7@49.0.0",
+      "bom-ref": "cryptography-7@50.0.0",
       "name": "cryptography",
-      "purl": "pkg:pypi/cryptography@49.0.0",
+      "purl": "pkg:pypi/cryptography@50.0.0",
       "type": "library",
-      "version": "49.0.0"
+      "version": "50.0.0"
     },
     {
       "bom-ref": "defusedxml-8@0.7.1",
@@ -238,11 +238,11 @@
       "version": "2.7.0"
     },
     {
-      "bom-ref": "validibot-shared-34@0.22.0",
+      "bom-ref": "validibot-shared-34@0.23.0",
       "name": "validibot-shared",
-      "purl": "pkg:pypi/validibot-shared@0.22.0",
+      "purl": "pkg:pypi/validibot-shared@0.23.0",
       "type": "library",
-      "version": "0.22.0"
+      "version": "0.23.0"
     },
     {
       "bom-ref": "xlrd-35@2.0.2",
@@ -278,7 +278,7 @@
       "dependsOn": [
         "cffi-5@2.1.0"
       ],
-      "ref": "cryptography-7@49.0.0"
+      "ref": "cryptography-7@50.0.0"
     },
     {
       "ref": "defusedxml-8@0.7.1"
@@ -298,7 +298,7 @@
     },
     {
       "dependsOn": [
-        "cryptography-7@49.0.0",
+        "cryptography-7@50.0.0",
         "pyasn1-modules-25@0.4.2"
       ],
       "ref": "google-auth-11@2.56.2"
@@ -433,7 +433,7 @@
         "defusedxml-8@0.7.1",
         "pydantic-27@2.13.4"
       ],
-      "ref": "validibot-shared-34@0.22.0"
+      "ref": "validibot-shared-34@0.23.0"
     },
     {
       "ref": "xlrd-35@2.0.2"
@@ -441,7 +441,7 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "validibot-validator-backend-portfolio-manager@0.16.3",
+      "bom-ref": "validibot-validator-backend-portfolio-manager@0.16.4",
       "name": "validibot-validator-backend-portfolio-manager",
       "properties": [
         {
@@ -450,11 +450,11 @@
         },
         {
           "name": "io.validibot.shared-contract.version",
-          "value": "0.22.0"
+          "value": "0.23.0"
         }
       ],
       "type": "application",
-      "version": "0.16.3"
+      "version": "0.16.4"
     },
     "tools": [
       {
@@ -464,7 +464,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:f133c2ce-1bfa-5299-9a3e-f3e18d4e5bbe",
+  "serialNumber": "urn:uuid:b8aeca29-862a-5623-8c56-ab25714a899c",
   "specVersion": "1.5",
   "version": 1
 }

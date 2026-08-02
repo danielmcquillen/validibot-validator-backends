@@ -9,6 +9,7 @@
 #   just build energyplus       # Build a specific validator locally
 #   just test                   # Run all tests
 #   just deploy energyplus dev  # Deploy to dev stage
+#   just release-all            # Release every newly versioned backend
 #
 # SETUP:
 #   Before using build-push or deploy commands, create a .env file:
@@ -396,12 +397,69 @@ verify-all:
 # Release
 # =============================================================================
 #
-# Cuts one backend-specific signed tag. CI builds only that backend image with
+# Cuts backend-specific signed tags. CI builds each tagged backend image with
 # full supply-chain provenance, a release JSON record, and an SBOM.
 # Published and failed tags are immutable. If a tagged workflow fails, fix the
 # source, bump only that backend's release_version, and create a new tag.
 #
 # Operator verification (after pull): see RELEASING.md.
+
+# Run the repository and dependency checks shared by every release command.
+_release-preflight:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if [[ -n $(git status --porcelain) ]]; then
+        echo "✗ Working tree has uncommitted changes. Commit or stash first."
+        git status --short
+        exit 1
+    fi
+
+    BRANCH=$(git branch --show-current)
+    if [[ "$BRANCH" != "main" ]]; then
+        echo "✗ Not on main branch (currently on '$BRANCH')."
+        echo "  Releases are cut from main only. Switch with: git switch main"
+        exit 1
+    fi
+
+    git fetch origin main
+    if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+        echo "✗ Local main is not in sync with origin/main."
+        echo "  Run: git pull --ff-only"
+        exit 1
+    fi
+
+    # Catch a forgotten validibot-shared bump before immutable images are cut.
+    # Override only when an older shared release is intentionally required.
+    if [[ "${VALIDIBOT_RELEASE_ALLOW_STALE_SHARED:-0}" != "1" ]]; then
+        SHARED_PINNED="$(
+            sed -nE 's/.*"validibot-shared==([^" ]+)".*/\1/p' pyproject.toml |
+                head -1
+        )"
+        if [[ -z "$SHARED_PINNED" ]]; then
+            echo "⚠ Could not detect validibot-shared pin in pyproject.toml; skipping freshness check."
+        else
+            SHARED_LATEST="$(
+                curl -s --max-time 10 https://pypi.org/pypi/validibot-shared/json 2>/dev/null |
+                    jq -r '.info.version' 2>/dev/null || true
+            )"
+            if [[ -z "$SHARED_LATEST" ]] || [[ "$SHARED_LATEST" == "null" ]]; then
+                echo "⚠ Could not query PyPI for latest validibot-shared. Currently pinned: $SHARED_PINNED."
+                echo "  Press Enter to continue anyway, Ctrl+C to abort..."
+                read -r
+            elif [[ "$SHARED_PINNED" != "$SHARED_LATEST" ]]; then
+                echo "✗ validibot-shared is pinned to $SHARED_PINNED but latest on PyPI is $SHARED_LATEST."
+                echo ""
+                echo "  Update pyproject.toml to validibot-shared==$SHARED_LATEST, commit it,"
+                echo "  and rerun the release command."
+                echo ""
+                echo "  Emergency override: VALIDIBOT_RELEASE_ALLOW_STALE_SHARED=1 just release ..."
+                exit 1
+            else
+                echo "✓ validibot-shared is at latest ($SHARED_LATEST)"
+            fi
+        fi
+    fi
 
 # Sign and push the version already recorded for one backend in backends.toml.
 # Usage: just release energyplus
@@ -413,72 +471,17 @@ release BACKEND:
     TAG="{{BACKEND}}-v${VERSION}"
     python3 scripts/backend_inventory.py release "$TAG" >/dev/null
 
-    # Refuse if working tree is dirty.
-    if [[ -n $(git status --porcelain) ]]; then
-        echo "✗ Working tree has uncommitted changes. Commit or stash first."
-        git status --short
-        exit 1
-    fi
-
-    # Refuse if not on main.
-    BRANCH=$(git branch --show-current)
-    if [[ "$BRANCH" != "main" ]]; then
-        echo "✗ Not on main branch (currently on '$BRANCH')."
-        echo "  Releases are cut from main only. Switch with: git checkout main"
-        exit 1
-    fi
+    just _release-preflight
 
     # Refuse if tag already exists locally or remotely.
-    if git rev-parse "$TAG" >/dev/null 2>&1; then
+    if git show-ref --verify --quiet "refs/tags/$TAG"; then
         echo "✗ Tag $TAG already exists locally."
         exit 1
     fi
-    if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "$TAG"; then
+    REMOTE_TAG="$(git ls-remote --tags origin "refs/tags/$TAG")"
+    if [[ -n "$REMOTE_TAG" ]]; then
         echo "✗ Tag $TAG already exists on origin."
         exit 1
-    fi
-
-    # Confirm we're up-to-date with origin.
-    git fetch origin main
-    if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
-        echo "✗ Local main is not in sync with origin/main."
-        echo "  Run: git pull"
-        exit 1
-    fi
-
-    # Verify the cross-repo dependency on validibot-shared is at the
-    # latest published version. This catches the "I forgot to bump
-    # validibot-shared in this repo after publishing a new shared
-    # release" failure mode — easy to miss, hard to debug after the
-    # release is out (image bytes are wrong, validators may misbehave).
-    #
-    # Override with VALIDIBOT_RELEASE_ALLOW_STALE_SHARED=1 for
-    # emergencies (e.g. PyPI is down, or you intentionally want to
-    # pin to an older shared release).
-    if [[ "${VALIDIBOT_RELEASE_ALLOW_STALE_SHARED:-0}" != "1" ]]; then
-        SHARED_PINNED=$(grep -E '"validibot-shared==' pyproject.toml | head -1 | sed -E 's/.*"validibot-shared==([^"]+)".*/\1/')
-        if [[ -z "$SHARED_PINNED" ]]; then
-            echo "⚠ Could not detect validibot-shared pin in pyproject.toml; skipping freshness check."
-        else
-            SHARED_LATEST=$(curl -s --max-time 10 https://pypi.org/pypi/validibot-shared/json 2>/dev/null | jq -r '.info.version' 2>/dev/null)
-            if [[ -z "$SHARED_LATEST" ]] || [[ "$SHARED_LATEST" == "null" ]]; then
-                echo "⚠ Could not query PyPI for latest validibot-shared. Currently pinned: $SHARED_PINNED."
-                echo "  Press Enter to continue anyway, Ctrl+C to abort..."
-                read -r
-            elif [[ "$SHARED_PINNED" != "$SHARED_LATEST" ]]; then
-                echo "✗ validibot-shared is pinned to $SHARED_PINNED but latest on PyPI is $SHARED_LATEST."
-                echo ""
-                echo "  Update pyproject.toml so the line reads:"
-                echo "      \"validibot-shared==$SHARED_LATEST\","
-                echo ""
-                echo "  Then commit + push, and re-run: just release {{BACKEND}}"
-                echo ""
-                echo "  Override (emergencies only): VALIDIBOT_RELEASE_ALLOW_STALE_SHARED=1 just release {{BACKEND}}"
-                exit 1
-            else
-                echo "✓ validibot-shared is at latest ($SHARED_LATEST)"
-            fi
-        fi
     fi
 
     just check
@@ -511,4 +514,83 @@ release BACKEND:
     echo "    3. Push to GHCR with sigstore attestation"
     echo "    4. Generate and attest the backend release JSON"
     echo "    5. Attach the release JSON and SBOM to GitHub Releases"
+    echo "  Monitor: gh run watch"
+
+# Sign and atomically push every current inventory tag not yet on origin.
+# Usage: just release-all
+release-all:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    just _release-preflight
+
+    TAGS=()
+    NEW_TAGS=()
+    while IFS= read -r TAG; do
+        [[ -n "$TAG" ]] || continue
+        python3 scripts/backend_inventory.py release "$TAG" >/dev/null
+
+        REMOTE_TAG="$(git ls-remote --tags origin "refs/tags/$TAG")"
+        if [[ -n "$REMOTE_TAG" ]]; then
+            echo "✓ Already released: $TAG"
+            continue
+        fi
+
+        if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            echo "↻ Resuming local signed tag: $TAG"
+            if ! git \
+                -c gpg.format=ssh \
+                -c gpg.ssh.allowedSignersFile=.allowed_signers \
+                verify-tag "$TAG"; then
+                echo "✗ Existing local tag $TAG does not have a trusted signature."
+                exit 1
+            fi
+            if [[ "$(git rev-list -n 1 "$TAG")" != "$(git rev-parse HEAD)" ]]; then
+                echo "✗ Existing local tag $TAG does not point to the current main commit."
+                exit 1
+            fi
+        else
+            NEW_TAGS+=("$TAG")
+        fi
+        TAGS+=("$TAG")
+    done < <(python3 scripts/backend_inventory.py release-tags)
+
+    if [[ "${#TAGS[@]}" -eq 0 ]]; then
+        echo "✓ Every release-enabled backend version in backends.toml is already released."
+        exit 0
+    fi
+
+    just check
+
+    echo ""
+    echo "About to sign and atomically push these backend releases:"
+    for TAG in "${TAGS[@]}"; do
+        echo "  - $TAG"
+    done
+    echo "Press Enter to continue, Ctrl+C to abort..."
+    read -r
+
+    for TAG in "${NEW_TAGS[@]}"; do
+        git tag -s "$TAG" -m "$TAG"
+    done
+
+    for TAG in "${TAGS[@]}"; do
+        if ! git \
+            -c gpg.format=ssh \
+            -c gpg.ssh.allowedSignersFile=.allowed_signers \
+            verify-tag "$TAG"; then
+            echo "✗ Local verification failed for $TAG; no tags were pushed."
+            exit 1
+        fi
+        if [[ "$(git rev-list -n 1 "$TAG")" != "$(git rev-parse HEAD)" ]]; then
+            echo "✗ $TAG does not point to the current main commit; no tags were pushed."
+            exit 1
+        fi
+    done
+
+    git push --atomic origin "${TAGS[@]}"
+
+    echo ""
+    echo "✓ Pushed ${#TAGS[@]} backend release tag(s) atomically."
+    echo "  GitHub Actions will test, build, attest, and publish each backend independently."
     echo "  Monitor: gh run watch"

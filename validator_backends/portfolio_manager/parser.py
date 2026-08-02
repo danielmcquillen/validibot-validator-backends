@@ -100,15 +100,26 @@ _ALIASES: dict[str, set[str]] = {
         "propertytypeselfselected",
         "primaryfunction",
     },
+    # EPA's gross floor area excludes parking, so only parking-excluded
+    # headings alias onto the canonical field. "Property Floor Area (Buildings
+    # and Parking)" and "Property Floor Area (Parking)" are semantically
+    # different columns and get their own fields; `_resolve_gross_floor_area`
+    # then decides which one backs the canonical value.
     "gross_floor_area_ft2": {
         "propertygfaselfreportedft2",
         "propertygrossfloorareaselfreportedft2",
-        "propertyfloorareabuildingsandparking",
-        "propertyfloorareabuildingsandparkingft2",
         "propgrossfloorarea",
         "grossfloorareaft2",
         "grossfloorarea",
         "propertygfa",
+    },
+    "gross_floor_area_buildings_and_parking_ft2": {
+        "propertyfloorareabuildingsandparking",
+        "propertyfloorareabuildingsandparkingft2",
+    },
+    "parking_floor_area_ft2": {
+        "propertyfloorareaparking",
+        "propertyfloorareaparkingft2",
     },
     "site_eui_kbtu_ft2_yr": {
         "siteeuikbtuft2",
@@ -204,6 +215,8 @@ _ALIASES: dict[str, set[str]] = {
 _ALIAS_TO_FIELD = {alias: field for field, aliases in _ALIASES.items() for alias in aliases}
 _DECIMAL_FIELDS = {
     "gross_floor_area_ft2",
+    "gross_floor_area_buildings_and_parking_ft2",
+    "parking_floor_area_ft2",
     "site_eui_kbtu_ft2_yr",
     "weather_normalized_site_eui_kbtu_ft2_yr",
     "source_eui_kbtu_ft2_yr",
@@ -991,6 +1004,7 @@ def _record_from_mapping(
             metric_states[field] = "not_available"
         else:
             metric_states[field] = "invalid"
+    _resolve_gross_floor_area(values, metric_states)
     values["metric_states"] = metric_states
     for field in _DATE_FIELDS:
         raw = mapping.get(field)
@@ -1007,6 +1021,53 @@ def _record_from_mapping(
     if not values["property_id"]:
         raise PortfolioManagerParseError("A property row is missing Portfolio Manager Property ID")
     return PortfolioManagerPropertyResult.model_validate(values)
+
+
+def _resolve_gross_floor_area(
+    values: dict[str, Any],
+    metric_states: dict[str, str],
+) -> None:
+    """Back the canonical GFA with a parking-excluded value and record its basis.
+
+    Portfolio Manager publishes three related floor-area columns, and only the
+    self-reported one matches EPA's gross floor area definition (and therefore
+    Washington's Form B basis). Precedence is explicit so the resolved value
+    never depends on the order headings or XML metrics happen to appear in:
+
+    1. a directly reported parking-excluded column wins outright;
+    2. otherwise the parking-inclusive column minus the parking column is the
+       parking-excluded area, by EPA's own definition of the two columns;
+    3. otherwise the parking-inclusive column is used unchanged, because many
+       report templates carry no other floor area at all — but the basis says
+       so, rather than letting a parking-inclusive number pass as GFA.
+    """
+    self_reported = values["gross_floor_area_ft2"]
+    inclusive = values["gross_floor_area_buildings_and_parking_ft2"]
+    parking = values["parking_floor_area_ft2"]
+
+    if self_reported is not None:
+        basis = "self_reported"
+    elif inclusive is None:
+        basis = "absent"
+    elif parking is not None and inclusive >= parking:
+        # Parking never exceeds buildings-and-parking in a coherent report; a
+        # contradiction means the two columns cannot be reconciled, so fall
+        # through to the unchanged inclusive value rather than invent one.
+        values["gross_floor_area_ft2"] = inclusive - parking
+        basis = "buildings_and_parking_less_parking"
+    else:
+        values["gross_floor_area_ft2"] = inclusive
+        basis = "buildings_and_parking"
+
+    values["gross_floor_area_basis"] = basis
+    if values["gross_floor_area_ft2"] is not None:
+        metric_states["gross_floor_area_ft2"] = "value"
+    elif metric_states["gross_floor_area_ft2"] == "absent":
+        # No parking-excluded column was reported, so the canonical metric is
+        # only as knowable as the parking-inclusive column it would derive from.
+        metric_states["gross_floor_area_ft2"] = metric_states[
+            "gross_floor_area_buildings_and_parking_ft2"
+        ]
 
 
 def _decimal(value: Any) -> Decimal | None:

@@ -57,11 +57,11 @@
       "version": "4.4.0"
     },
     {
-      "bom-ref": "cryptography-9@49.0.0",
+      "bom-ref": "cryptography-9@50.0.0",
       "name": "cryptography",
-      "purl": "pkg:pypi/cryptography@49.0.0",
+      "purl": "pkg:pypi/cryptography@50.0.0",
       "type": "library",
-      "version": "49.0.0"
+      "version": "50.0.0"
     },
     {
       "bom-ref": "defusedxml-10@0.7.1",
@@ -322,11 +322,11 @@
       "version": "2.66.1"
     },
     {
-      "bom-ref": "traitlets-46@5.15.1",
+      "bom-ref": "traitlets-46@5.16.0",
       "name": "traitlets",
-      "purl": "pkg:pypi/traitlets@5.15.1",
+      "purl": "pkg:pypi/traitlets@5.16.0",
       "type": "library",
-      "version": "5.15.1"
+      "version": "5.16.0"
     },
     {
       "bom-ref": "typing-extensions-47@4.16.0",
@@ -350,11 +350,11 @@
       "version": "2.7.0"
     },
     {
-      "bom-ref": "validibot-shared-50@0.22.0",
+      "bom-ref": "validibot-shared-50@0.23.0",
       "name": "validibot-shared",
-      "purl": "pkg:pypi/validibot-shared@0.22.0",
+      "purl": "pkg:pypi/validibot-shared@0.23.0",
       "type": "library",
-      "version": "0.22.0"
+      "version": "0.23.0"
     }
   ],
   "dependencies": [
@@ -389,7 +389,7 @@
       "dependsOn": [
         "cffi-6@2.1.0"
       ],
-      "ref": "cryptography-9@49.0.0"
+      "ref": "cryptography-9@50.0.0"
     },
     {
       "ref": "defusedxml-10@0.7.1"
@@ -422,7 +422,7 @@
     },
     {
       "dependsOn": [
-        "cryptography-9@49.0.0",
+        "cryptography-9@50.0.0",
         "pyasn1-modules-38@0.4.2"
       ],
       "ref": "google-auth-14@2.56.2"
@@ -506,7 +506,7 @@
     {
       "dependsOn": [
         "platformdirs-34@4.11.0",
-        "traitlets-46@5.15.1"
+        "traitlets-46@5.16.0"
       ],
       "ref": "jupyter-core-27@5.9.1"
     },
@@ -527,7 +527,7 @@
         "fastjsonschema-11@2.22.1",
         "jsonschema-25@4.26.0",
         "jupyter-core-27@5.9.1",
-        "traitlets-46@5.15.1"
+        "traitlets-46@5.16.0"
       ],
       "ref": "nbformat-32@5.10.4"
     },
@@ -600,7 +600,7 @@
       "ref": "sentry-sdk-45@2.66.1"
     },
     {
-      "ref": "traitlets-46@5.15.1"
+      "ref": "traitlets-46@5.16.0"
     },
     {
       "ref": "typing-extensions-47@4.16.0"
@@ -619,12 +619,12 @@
         "defusedxml-10@0.7.1",
         "pydantic-40@2.13.4"
       ],
-      "ref": "validibot-shared-50@0.22.0"
+      "ref": "validibot-shared-50@0.23.0"
     }
   ],
   "metadata": {
     "component": {
-      "bom-ref": "validibot-validator-backend-fmu@0.15.3",
+      "bom-ref": "validibot-validator-backend-fmu@0.15.4",
       "name": "validibot-validator-backend-fmu",
       "properties": [
         {
@@ -633,11 +633,11 @@
         },
         {
           "name": "io.validibot.shared-contract.version",
-          "value": "0.22.0"
+          "value": "0.23.0"
         }
       ],
       "type": "application",
-      "version": "0.15.3"
+      "version": "0.15.4"
     },
     "tools": [
       {
@@ -647,7 +647,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:e3b165d9-76cc-55a4-b13e-480588051583",
+  "serialNumber": "urn:uuid:33d7ff98-95be-5786-bd17-affb31106551",
   "specVersion": "1.5",
   "version": 1
 }
