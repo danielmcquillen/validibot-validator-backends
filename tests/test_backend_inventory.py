@@ -100,14 +100,24 @@ def test_release_and_developer_builds_are_inventory_driven():
     assert justfile.index('verify-tag "$TAG"') < justfile.index('git push origin "$TAG"')
     assert "release-all:" in justfile
     assert "scripts/backend_inventory.py release-tags" in justfile
-    assert 'git push --atomic origin "${TAGS[@]}"' in justfile
+    assert 'git push --atomic origin "${TAGS[@]}"' not in justfile
+    assert 'for TAG in "${TAGS[@]}"; do\n        git push origin "$TAG"' in justfile
+    assert "recover-releases:" in justfile
+    assert "gh workflow run release.yml" in justfile
 
 
 def test_release_workflow_uses_protected_main_as_its_trust_anchor():
     """A signed tag must not be allowed to smuggle in its own trusted key."""
     release_yml = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert "workflow_dispatch:" not in release_yml
+    assert "workflow_dispatch:" in release_yml
+    assert "Existing signed backend release tag to recover" in release_yml
+    assert "inputs.tag || github.ref_name" in release_yml
+    assert "inputs.tag || github.ref" in release_yml
+    assert 'git check-ref-format "refs/tags/$RELEASE_TAG"' in release_yml
+    assert 'git verify-tag -- "$RELEASE_TAG"' in release_yml
+    assert release_yml.count("RELEASE_TAG: ${{ inputs.tag || github.ref_name }}") == 2
+    assert release_yml.count("ref: ${{ needs.select-release.outputs.source_tag }}") == 2
     assert "origin/main:.allowed_signers" in release_yml
     assert "git merge-base --is-ancestor" in release_yml
     assert "TAG_COMMIT" in release_yml
