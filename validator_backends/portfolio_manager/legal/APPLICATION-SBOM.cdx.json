@@ -43,11 +43,11 @@
       "version": "3.4.9"
     },
     {
-      "bom-ref": "cryptography-7@49.0.0",
+      "bom-ref": "cryptography-7@50.0.0",
       "name": "cryptography",
-      "purl": "pkg:pypi/cryptography@49.0.0",
+      "purl": "pkg:pypi/cryptography@50.0.0",
       "type": "library",
-      "version": "49.0.0"
+      "version": "50.0.0"
     },
     {
       "bom-ref": "defusedxml-8@0.7.1",
@@ -278,7 +278,7 @@
       "dependsOn": [
         "cffi-5@2.1.0"
       ],
-      "ref": "cryptography-7@49.0.0"
+      "ref": "cryptography-7@50.0.0"
     },
     {
       "ref": "defusedxml-8@0.7.1"
@@ -298,7 +298,7 @@
     },
     {
       "dependsOn": [
-        "cryptography-7@49.0.0",
+        "cryptography-7@50.0.0",
         "pyasn1-modules-25@0.4.2"
       ],
       "ref": "google-auth-11@2.56.2"
@@ -464,7 +464,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:0fb9311a-83a3-5e61-9282-4a196012647e",
+  "serialNumber": "urn:uuid:b8aeca29-862a-5623-8c56-ab25714a899c",
   "specVersion": "1.5",
   "version": 1
 }
