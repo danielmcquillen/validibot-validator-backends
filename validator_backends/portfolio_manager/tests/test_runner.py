@@ -549,3 +549,121 @@ def test_real_xml_alert_metrics_satisfy_every_enabled_quality_check(
         finding.code == "portfolio_manager.check_not_verifiable"
         for finding in result.outputs.findings
     )
+
+
+# ── GFA-weighted aggregates use the parking-excluded floor area ──
+#
+# Portfolio Manager computes Site EUI and WNEUI on its own parking-excluded
+# denominator, so a parking-inclusive floor area never distorts an intensity.
+# It distorts the aggregates that use floor area as a *quantity*: the weight in
+# ``_weighted_metric``, ``total_gross_floor_area_ft2``, and
+# ``_floor_area_compliance_percent``. See ``test_gross_floor_area.py`` for the
+# per-carrier parsing rules these aggregates depend on.
+
+
+def _xlsx_floor_area_bytes(
+    *,
+    property_id: str,
+    wneui: float,
+    floor_area_columns: dict[str, object],
+) -> bytes:
+    """Create a one-property report whose floor-area columns vary per case."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(
+        [
+            "Portfolio Manager Property ID",
+            "Reporting Period Starting Date",
+            "Reporting Period Ending Date",
+            *floor_area_columns,
+            "Site EUI (kBtu/ft²)",
+            "Weather Normalized Site EUI (kBtu/ft²)",
+        ]
+    )
+    sheet.append(
+        [
+            property_id,
+            "2025-01-01",
+            "2025-12-31",
+            *floor_area_columns.values(),
+            wneui + 2,
+            wneui,
+        ]
+    )
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    workbook.close()
+    return buffer.getvalue()
+
+
+def test_portfolio_aggregates_exclude_reported_parking_area(tmp_path: Path) -> None:
+    """A garage must not inflate a property's weight in portfolio aggregates.
+
+    Property 501 reports 100,000 ft² of buildings and parking with a 50,000 ft²
+    garage, so it is a 50,000 ft² building — the same size as property 502.
+    Counting the garage would make it twice 502's size and pull the weighted
+    WNEUI from 40.0 up toward its own 60.0, overstating the portfolio's
+    weather-normalized intensity and the regulated floor area alongside it.
+    """
+    archive = _zip_bytes(
+        {
+            "garage.xlsx": _xlsx_floor_area_bytes(
+                property_id="501",
+                wneui=60,
+                floor_area_columns={
+                    "Property Floor Area (Buildings and Parking) (ft²)": 100_000,
+                    "Property Floor Area (Parking) (ft²)": 50_000,
+                },
+            ),
+            "plain.xlsx": _xlsx_floor_area_bytes(
+                property_id="502",
+                wneui=20,
+                floor_area_columns={"Property GFA - Self-Reported (ft²)": 50_000},
+            ),
+        }
+    )
+    envelope = _envelope(
+        tmp_path,
+        submission_name="reports.zip",
+        submission_bytes=archive,
+        inputs=PortfolioManagerInputs(submission_structure="zip_collection"),
+    )
+
+    result = run_portfolio_manager_validation(envelope)
+
+    assert result.status == ValidationStatus.SUCCESS
+    assert str(result.outputs.total_gross_floor_area_ft2) == "100000"
+    assert str(result.outputs.weighted_weather_normalized_site_eui_kbtu_ft2_yr) == "40"
+
+
+def test_property_results_artifact_publishes_the_floor_area_basis(
+    tmp_path: Path,
+) -> None:
+    """Downstream consumers must be able to see which definition backs a GFA.
+
+    The ADR keeps program policy in the author's hands, so a parking-inclusive
+    floor area is published as an auditable fact rather than suppressed. That
+    only works if the basis and the underlying columns survive into the
+    carrier-neutral artifact that CEL and reviewers read.
+    """
+    report = _xlsx_floor_area_bytes(
+        property_id="601",
+        wneui=38,
+        floor_area_columns={
+            "Property Floor Area (Buildings and Parking) (ft²)": 100_000,
+        },
+    )
+    envelope = _envelope(
+        tmp_path,
+        submission_name="report.xlsx",
+        submission_bytes=report,
+        inputs=PortfolioManagerInputs(),
+    )
+    result = run_portfolio_manager_validation(envelope)
+
+    payload = json.loads(property_results_artifact_json(result.outputs))
+    prop = payload["properties"][0]
+
+    assert prop["gross_floor_area_basis"] == "buildings_and_parking"
+    assert prop["gross_floor_area_buildings_and_parking_ft2"] == "100000"
+    assert prop["parking_floor_area_ft2"] is None

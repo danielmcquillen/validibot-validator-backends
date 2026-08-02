@@ -5,12 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Backend releases: EnergyPlus 0.15.5; FMU/SHACL/Schematron 0.15.4; Portfolio Manager 0.16.4 - 2026-08-02
 
-### Security
+### Changed
 
-- Advance the EnergyPlus backend to `0.15.4` for its first publication after
-  enabling GitHub immutable releases.
+- Align all five backend environments with the published
+  `validibot-shared==0.23.0` contract.
+- Release the Portfolio Manager floor-area correction as `0.16.4`, preserving
+  parking-excluded gross floor area as the canonical quantity while retaining
+  the source columns and resolution basis.
 
 ## Backend releases: EnergyPlus/FMU/SHACL/Schematron 0.15.3; Portfolio Manager 0.16.3 - 2026-07-29
 

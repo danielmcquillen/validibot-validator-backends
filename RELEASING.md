@@ -60,11 +60,11 @@ A fresh release ships these values:
 
 | Backend | Wrapper version | Bundled library |
 |---|---|---|
-| EnergyPlus | `0.15.4` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
-| FMU | `0.15.3` (`backends.toml`) | FMPy 0.3.30 |
-| SHACL | `0.15.3` (`backends.toml`) | pySHACL 0.40.1 |
-| Schematron | `0.15.3` (`backends.toml`) | SaxonC-HE 13.0.0 |
-| Portfolio Manager | `0.16.3` (`backends.toml`) | openpyxl 3.1.5 and xlrd 2.0.2 |
+| EnergyPlus | `0.15.5` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
+| FMU | `0.15.4` (`backends.toml`) | FMPy 0.3.30 |
+| SHACL | `0.15.4` (`backends.toml`) | pySHACL 0.40.1 |
+| Schematron | `0.15.4` (`backends.toml`) | SaxonC-HE 13.0.0 |
+| Portfolio Manager | `0.16.4` (`backends.toml`) | openpyxl 3.1.5 and xlrd 2.0.2 |
 
 Bumping the wrapper version does NOT imply bumping the bundled library,
 and vice versa. They iterate independently.
@@ -141,11 +141,11 @@ source commit. The tag does not supply its own trust anchor.
 # Pull the image. For production, prefer pinning by digest rather
 # than tag — operators running with VALIDATOR_BACKEND_IMAGE_POLICY=digest
 # require this anyway.
-docker pull ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.4
+docker pull ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.5
 
 # Resolve the digest:
 DIGEST=$(crane digest \
-  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.4)
+  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.5)
 echo "Image digest: $DIGEST"
 
 # Verify the sigstore attestation against the digest. This
@@ -196,8 +196,8 @@ billing), mirror the digest to your registry:
 brew install crane   # or download from go-containerregistry releases
 
 crane copy \
-  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.4 \
-  111122223333.dkr.ecr.us-west-2.amazonaws.com/validibot-validator-backend-energyplus:v0.15.4
+  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.5 \
+  111122223333.dkr.ecr.us-west-2.amazonaws.com/validibot-validator-backend-energyplus:v0.15.5
 ```
 
 The image digest is preserved across the copy, so
@@ -209,16 +209,16 @@ name.
 
 ```bash
 # On an internet-connected transit host:
-docker pull ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.4
+docker pull ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.5
 gh attestation verify \
-  "oci://ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.4" \
+  "oci://ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.5" \
   --owner mcquilleninteractive
-docker save -o energyplus-v0.15.4.tar \
-  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.4
+docker save -o energyplus-v0.15.5.tar \
+  ghcr.io/mcquilleninteractive/validibot-validator-backend-energyplus:v0.15.5
 
 # Transfer the tarball through your air-gap process. On the
 # air-gapped host:
-docker load -i energyplus-v0.15.4.tar
+docker load -i energyplus-v0.15.5.tar
 ```
 
 Verification happens at the network boundary (the transit host),
