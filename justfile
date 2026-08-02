@@ -516,7 +516,8 @@ release BACKEND:
     echo "    5. Attach the release JSON and SBOM to GitHub Releases"
     echo "  Monitor: gh run watch"
 
-# Sign and atomically push every current inventory tag not yet on origin.
+# Sign and individually push every current inventory tag not yet on origin.
+# GitHub suppresses workflow events when more than three tags share one push.
 # Usage: just release-all
 release-all:
     #!/usr/bin/env bash
@@ -532,7 +533,7 @@ release-all:
 
         REMOTE_TAG="$(git ls-remote --tags origin "refs/tags/$TAG")"
         if [[ -n "$REMOTE_TAG" ]]; then
-            echo "✓ Already released: $TAG"
+            echo "✓ Already on origin: $TAG"
             continue
         fi
 
@@ -556,14 +557,14 @@ release-all:
     done < <(python3 scripts/backend_inventory.py release-tags)
 
     if [[ "${#TAGS[@]}" -eq 0 ]]; then
-        echo "✓ Every release-enabled backend version in backends.toml is already released."
+        echo "✓ Every current backend tag is already on origin."
         exit 0
     fi
 
     just check
 
     echo ""
-    echo "About to sign and atomically push these backend releases:"
+    echo "About to sign and push these backend releases one at a time:"
     for TAG in "${TAGS[@]}"; do
         echo "  - $TAG"
     done
@@ -588,9 +589,75 @@ release-all:
         fi
     done
 
-    git push --atomic origin "${TAGS[@]}"
+    for TAG in "${TAGS[@]}"; do
+        git push origin "$TAG"
+    done
 
     echo ""
-    echo "✓ Pushed ${#TAGS[@]} backend release tag(s) atomically."
+    echo "✓ Pushed ${#TAGS[@]} backend release tag(s)."
     echo "  GitHub Actions will test, build, attest, and publish each backend independently."
     echo "  Monitor: gh run watch"
+
+# Dispatch releases for current signed tags whose GitHub push event was absent.
+# Usage: just recover-releases
+recover-releases:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    just _release-preflight
+    gh auth status >/dev/null
+    REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+    git fetch --tags origin
+
+    TAGS=()
+    while IFS= read -r TAG; do
+        [[ -n "$TAG" ]] || continue
+        python3 scripts/backend_inventory.py release "$TAG" >/dev/null
+
+        REMOTE_TAG="$(git ls-remote --tags origin "refs/tags/$TAG")"
+        if [[ -z "$REMOTE_TAG" ]]; then
+            echo "✗ Signed tag $TAG is not present on origin."
+            exit 1
+        fi
+        if ! git \
+            -c gpg.format=ssh \
+            -c gpg.ssh.allowedSignersFile=.allowed_signers \
+            verify-tag "$TAG"; then
+            echo "✗ $TAG does not have a trusted signature."
+            exit 1
+        fi
+        if ! git merge-base --is-ancestor "${TAG}^{commit}" HEAD; then
+            echo "✗ $TAG is not on protected main."
+            exit 1
+        fi
+
+        if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "✓ Already published: $TAG"
+            continue
+        fi
+        TAGS+=("$TAG")
+    done < <(python3 scripts/backend_inventory.py release-tags)
+
+    if [[ "${#TAGS[@]}" -eq 0 ]]; then
+        echo "✓ Every current backend tag already has a GitHub Release."
+        exit 0
+    fi
+
+    echo ""
+    echo "About to recover these existing signed releases:"
+    for TAG in "${TAGS[@]}"; do
+        echo "  - $TAG"
+    done
+    echo "Press Enter to continue, Ctrl+C to abort..."
+    read -r
+
+    for TAG in "${TAGS[@]}"; do
+        gh workflow run release.yml \
+            --repo "$REPO" \
+            --ref main \
+            --raw-field "tag=$TAG"
+    done
+
+    echo ""
+    echo "✓ Dispatched ${#TAGS[@]} signed-tag recovery workflow(s)."
+    echo "  Monitor: gh run list --workflow release.yml"

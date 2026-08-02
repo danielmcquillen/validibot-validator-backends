@@ -25,9 +25,23 @@ just release-all
 
 `just release-all` shows the exact tags and asks for confirmation once. It
 skips tags already on `origin`, signs the remaining tags, verifies all of them,
-then pushes them atomically. Each tag starts its own backend-specific GitHub
-Actions release. If an atomic push fails after tags were created locally,
-rerunning the same command safely verifies and resumes those local tags.
+then pushes them one at a time because [GitHub does not create workflow
+events when more than three tags share one
+push](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push).
+Each tag starts its own backend-specific GitHub Actions release. If a push
+fails after tags were created locally, rerunning the same command safely
+verifies and resumes them.
+
+If verified tags reached GitHub but their push event was not created, recover
+the current missing releases without deleting or moving their tags:
+
+```bash
+just recover-releases
+```
+
+The recovery command dispatches only current inventory tags that do not yet
+have a GitHub Release. The workflow still verifies each tag's signature and
+protected-main ancestry before building anything.
 
 Before either command, update the relevant `release_version` values and
 generated artifacts, commit the changes, merge them to `main`, and pull the
