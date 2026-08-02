@@ -399,8 +399,8 @@ verify-all:
 #
 # Cuts backend-specific signed tags. CI builds each tagged backend image with
 # full supply-chain provenance, a release JSON record, and an SBOM.
-# Published and failed tags are immutable. If a tagged workflow fails, fix the
-# source, bump only that backend's release_version, and create a new tag.
+# Published artifacts and signed tag objects are immutable. An unpublished tag
+# may be re-emitted unchanged when GitHub missed its original push event.
 #
 # Operator verification (after pull): see RELEASING.md.
 
@@ -516,24 +516,57 @@ release BACKEND:
     echo "    5. Attach the release JSON and SBOM to GitHub Releases"
     echo "  Monitor: gh run watch"
 
-# Sign and individually push every current inventory tag not yet on origin.
+# Publish every current inventory tag that does not yet have a GitHub Release.
 # GitHub suppresses workflow events when more than three tags share one push.
+# Existing unpublished tags are verified, briefly removed from origin, and
+# immediately re-pushed as the exact same signed tag object to retry the event.
 # Usage: just release-all
 release-all:
     #!/usr/bin/env bash
     set -euo pipefail
 
     just _release-preflight
+    gh auth status >/dev/null
+    REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+    git fetch --tags origin
 
     TAGS=()
     NEW_TAGS=()
+    RETRY_TAGS=()
     while IFS= read -r TAG; do
         [[ -n "$TAG" ]] || continue
         python3 scripts/backend_inventory.py release "$TAG" >/dev/null
 
         REMOTE_TAG="$(git ls-remote --tags origin "refs/tags/$TAG")"
         if [[ -n "$REMOTE_TAG" ]]; then
-            echo "✓ Already on origin: $TAG"
+            if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+                echo "✓ Already published: $TAG"
+                continue
+            fi
+            if ! git show-ref --verify --quiet "refs/tags/$TAG"; then
+                echo "✗ Origin has $TAG, but the local tag is missing after fetch."
+                exit 1
+            fi
+            if ! git \
+                -c gpg.format=ssh \
+                -c gpg.ssh.allowedSignersFile=.allowed_signers \
+                verify-tag "$TAG"; then
+                echo "✗ Existing tag $TAG does not have a trusted signature."
+                exit 1
+            fi
+            LOCAL_TAG_OBJECT="$(git rev-parse "refs/tags/$TAG")"
+            REMOTE_TAG_OBJECT="${REMOTE_TAG%%$'\t'*}"
+            if [[ "$LOCAL_TAG_OBJECT" != "$REMOTE_TAG_OBJECT" ]]; then
+                echo "✗ Local and remote tag objects differ for $TAG."
+                exit 1
+            fi
+            if ! git merge-base --is-ancestor "${TAG}^{commit}" HEAD; then
+                echo "✗ Existing tag $TAG is not on current main."
+                exit 1
+            fi
+            echo "↻ Unpublished signed tag will be retried: $TAG"
+            TAGS+=("$TAG")
+            RETRY_TAGS+=("$TAG")
             continue
         fi
 
@@ -557,16 +590,20 @@ release-all:
     done < <(python3 scripts/backend_inventory.py release-tags)
 
     if [[ "${#TAGS[@]}" -eq 0 ]]; then
-        echo "✓ Every current backend tag is already on origin."
+        echo "✓ Every current backend release is already published."
         exit 0
     fi
 
     just check
 
     echo ""
-    echo "About to sign and push these backend releases one at a time:"
+    echo "About to publish these backend releases one at a time:"
     for TAG in "${TAGS[@]}"; do
-        echo "  - $TAG"
+        if [[ " ${RETRY_TAGS[*]} " == *" $TAG "* ]]; then
+            echo "  - $TAG (retry unchanged signed tag)"
+        else
+            echo "  - $TAG (new signed tag)"
+        fi
     done
     echo "Press Enter to continue, Ctrl+C to abort..."
     read -r
@@ -583,81 +620,34 @@ release-all:
             echo "✗ Local verification failed for $TAG; no tags were pushed."
             exit 1
         fi
-        if [[ "$(git rev-list -n 1 "$TAG")" != "$(git rev-parse HEAD)" ]]; then
-            echo "✗ $TAG does not point to the current main commit; no tags were pushed."
-            exit 1
+        if [[ " ${RETRY_TAGS[*]} " == *" $TAG "* ]]; then
+            if ! git merge-base --is-ancestor "${TAG}^{commit}" HEAD; then
+                echo "✗ $TAG is not on current main; no tags were pushed."
+                exit 1
+            fi
+        else
+            if [[ "$(git rev-list -n 1 "$TAG")" != "$(git rev-parse HEAD)" ]]; then
+                echo "✗ $TAG does not point to the current main commit; no tags were pushed."
+                exit 1
+            fi
         fi
     done
 
     for TAG in "${TAGS[@]}"; do
-        git push origin "$TAG"
+        if [[ " ${RETRY_TAGS[*]} " == *" $TAG "* ]]; then
+            git push origin ":refs/tags/$TAG"
+            if ! git push origin "refs/tags/$TAG:refs/tags/$TAG"; then
+                echo "✗ Could not restore $TAG on origin."
+                echo "  The verified signed tag remains local. Restore it with:"
+                echo "  git push origin refs/tags/$TAG:refs/tags/$TAG"
+                exit 1
+            fi
+        else
+            git push origin "$TAG"
+        fi
     done
 
     echo ""
-    echo "✓ Pushed ${#TAGS[@]} backend release tag(s)."
+    echo "✓ Triggered ${#TAGS[@]} backend release(s)."
     echo "  GitHub Actions will test, build, attest, and publish each backend independently."
     echo "  Monitor: gh run watch"
-
-# Dispatch releases for current signed tags whose GitHub push event was absent.
-# Usage: just recover-releases
-recover-releases:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    just _release-preflight
-    gh auth status >/dev/null
-    REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
-    git fetch --tags origin
-
-    TAGS=()
-    while IFS= read -r TAG; do
-        [[ -n "$TAG" ]] || continue
-        python3 scripts/backend_inventory.py release "$TAG" >/dev/null
-
-        REMOTE_TAG="$(git ls-remote --tags origin "refs/tags/$TAG")"
-        if [[ -z "$REMOTE_TAG" ]]; then
-            echo "✗ Signed tag $TAG is not present on origin."
-            exit 1
-        fi
-        if ! git \
-            -c gpg.format=ssh \
-            -c gpg.ssh.allowedSignersFile=.allowed_signers \
-            verify-tag "$TAG"; then
-            echo "✗ $TAG does not have a trusted signature."
-            exit 1
-        fi
-        if ! git merge-base --is-ancestor "${TAG}^{commit}" HEAD; then
-            echo "✗ $TAG is not on protected main."
-            exit 1
-        fi
-
-        if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            echo "✓ Already published: $TAG"
-            continue
-        fi
-        TAGS+=("$TAG")
-    done < <(python3 scripts/backend_inventory.py release-tags)
-
-    if [[ "${#TAGS[@]}" -eq 0 ]]; then
-        echo "✓ Every current backend tag already has a GitHub Release."
-        exit 0
-    fi
-
-    echo ""
-    echo "About to recover these existing signed releases:"
-    for TAG in "${TAGS[@]}"; do
-        echo "  - $TAG"
-    done
-    echo "Press Enter to continue, Ctrl+C to abort..."
-    read -r
-
-    for TAG in "${TAGS[@]}"; do
-        gh workflow run release.yml \
-            --repo "$REPO" \
-            --ref main \
-            --raw-field "tag=$TAG"
-    done
-
-    echo ""
-    echo "✓ Dispatched ${#TAGS[@]} signed-tag recovery workflow(s)."
-    echo "  Monitor: gh run list --workflow release.yml"

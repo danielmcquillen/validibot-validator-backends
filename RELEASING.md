@@ -23,25 +23,22 @@ published:
 just release-all
 ```
 
-`just release-all` shows the exact tags and asks for confirmation once. It
-skips tags already on `origin`, signs the remaining tags, verifies all of them,
-then pushes them one at a time because [GitHub does not create workflow
+`just release-all` shows the exact unpublished versions and asks for
+confirmation once. It signs and verifies new tags, then pushes them one at a
+time because [GitHub does not create workflow
 events when more than three tags share one
 push](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push).
 Each tag starts its own backend-specific GitHub Actions release. If a push
 fails after tags were created locally, rerunning the same command safely
 verifies and resumes them.
 
-If verified tags reached GitHub but their push event was not created, recover
-the current missing releases without deleting or moving their tags:
-
-```bash
-just recover-releases
-```
-
-The recovery command dispatches only current inventory tags that do not yet
-have a GitHub Release. The workflow still verifies each tag's signature and
-protected-main ancestry before building anything.
+If a signed tag reached GitHub but no release was produced, the same command
+retries it without changing its version, source commit, signature, or tag
+object. It verifies that the local and remote signed tag objects are identical,
+briefly removes the unpublished remote reference, and immediately pushes that
+exact reference again so GitHub emits the missing tag event. Published releases
+are skipped, and the workflow independently refuses to overwrite either an
+existing GitHub Release or versioned container image.
 
 Before either command, update the relevant `release_version` values and
 generated artifacts, commit the changes, merge them to `main`, and pull the
@@ -132,9 +129,11 @@ The next `just build fmu` stamps `0.15.5`. Once the change is on `main`,
 backend. Use `just release-all` when versions for several backends changed in
 the same commit.
 
-Tags are immutable release attempts. If CI fails after a tag is pushed, leave
-that tag in place, fix the source, increment that backend's version, and create
-a new signed tag. Never force-move or reuse the failed tag.
+Signed tag objects and published artifacts are immutable. An unpublished tag
+may be retried unchanged by `just release-all`; this does not move or recreate
+the tag object. If the source must change, or a versioned image or GitHub
+Release already exists, increment that backend's version and create a new
+signed tag.
 
 ### Portfolio Manager V1 scope
 
