@@ -107,11 +107,11 @@ A fresh release ships these values:
 
 | Backend | Wrapper version | Bundled library |
 |---|---|---|
-| EnergyPlus | `0.15.5` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
-| FMU | `0.15.4` (`backends.toml`) | FMPy 0.3.30 |
-| SHACL | `0.15.4` (`backends.toml`) | pySHACL 0.40.1 |
-| Schematron | `0.15.4` (`backends.toml`) | SaxonC-HE 13.0.0 |
-| Portfolio Manager | `0.16.4` (`backends.toml`) | openpyxl 3.1.5 and xlrd 2.0.2 |
+| EnergyPlus | `0.16.0` (`backends.toml`) | EnergyPlus 25.2.0 (downloaded in the Dockerfile) |
+| FMU | `0.15.5` (`backends.toml`) | FMPy 0.3.30 |
+| SHACL | `0.15.5` (`backends.toml`) | pySHACL 0.40.1 |
+| Schematron | `0.15.5` (`backends.toml`) | SaxonC-HE 13.0.0 |
+| Portfolio Manager | `0.16.5` (`backends.toml`) | openpyxl 3.1.5 and xlrd 2.0.2 |
 
 Bumping the wrapper version does NOT imply bumping the bundled library,
 and vice versa. They iterate independently.

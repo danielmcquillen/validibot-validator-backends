@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased - EnergyPlus 0.16.0
+## Unreleased - EnergyPlus 0.16.0; FMU/SHACL/Schematron 0.15.5; Portfolio Manager 0.16.5
+
+### Changed
+
+- Align all five backend images with the published
+  `validibot-shared==0.24.0` contract and regenerate their locked requirements
+  and application SBOMs.
 
 ### Added
 
@@ -28,9 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Release note
 
-- Publish `validibot-shared` 0.24.0 first. Then update the EnergyPlus inventory,
-  requirements, generated lock, and SBOM together before releasing the backend
-  image as 0.16.0.
+- `validibot-shared` 0.24.0 is published. All five backend inventories,
+  requirements, generated locks, and application SBOMs are aligned with that
+  contract. Release the newly versioned images together with
+  `just release-all`.
 
 ## Backend releases: EnergyPlus 0.15.5; FMU/SHACL/Schematron 0.15.4; Portfolio Manager 0.16.4 - 2026-08-02
 
