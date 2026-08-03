@@ -77,8 +77,12 @@ def main() -> int:
         logger.info("Running EnergyPlus simulation...")
         outputs, work_dir, parsed_messages = run_energyplus_simulation(input_envelope)
 
-        # Determine status from simulation results
-        if outputs.energyplus_returncode == 0:
+        # A zero process return code is not sufficient review evidence: a fatal
+        # marker or a blocking Validibot/profile finding must also fail validation.
+        has_blocking_message = any(
+            message.get("severity", "error") == "error" for message in parsed_messages
+        )
+        if outputs.completed_successfully and not has_blocking_message:
             status = ValidationStatus.SUCCESS
         else:
             status = ValidationStatus.FAILED_VALIDATION
@@ -113,6 +117,7 @@ def main() -> int:
                     severity=severity,
                     text=msg.get("text", ""),
                     code=msg.get("code"),
+                    tags=list(msg.get("tags", [])),
                 )
             )
 

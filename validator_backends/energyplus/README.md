@@ -6,12 +6,12 @@ Container for running [EnergyPlus™](https://energyplus.net/) simulations as pa
 
 This container:
 1. Downloads `input.json` (EnergyPlusInputEnvelope) from storage
-2. Downloads IDF/epJSON model and EPW weather files from storage
-3. Runs EnergyPlus simulation
-4. Extracts metrics from SQL database
-5. Creates `output.json` (EnergyPlusOutputEnvelope) with results
-6. Uploads output.json to storage
-7. POSTs callback to the Validibot platform (cloud mode) or exits (local mode)
+2. Downloads the IDF/epJSON model and, for full runs, an EPW weather file
+3. Creates a private normalized model copy and runs selected review checks
+4. Runs a full EnergyPlus simulation or conversion-only preflight
+5. Extracts review evidence and available SQL metrics
+6. Creates and uploads `output.json` plus run artifacts
+7. POSTs a callback to Validibot (cloud mode) or exits (local mode)
 
 ## Container Interface
 
@@ -52,8 +52,10 @@ This container:
   ],
   "inputs": {
     "timestep_per_hour": 4,
-    "output_variables": ["Zone Mean Air Temperature"],
-    "invocation_mode": "cli"
+    "invocation_mode": "cli",
+    "idf_checks": ["duplicate-names", "hvac-sizing", "schedule-coverage"],
+    "run_simulation": true,
+    "review_profile": "standard"
   },
   "context": {
     "callback_url": "https://validibot.example.com/api/v1/validation-callbacks/",
@@ -79,26 +81,8 @@ This container:
     "started_at": "2025-12-04T10:00:00Z",
     "finished_at": "2025-12-04T10:05:30Z"
   },
-  "messages": [
-    {
-      "severity": "INFO",
-      "text": "Simulation completed successfully"
-    }
-  ],
-  "metrics": [
-    {
-      "name": "electricity_kwh",
-      "value": 1234.5,
-      "unit": "kWh",
-      "category": "energy"
-    },
-    {
-      "name": "energy_use_intensity_kwh_m2",
-      "value": 18.7,
-      "unit": "kWh/m²",
-      "category": "energy"
-    }
-  ],
+  "messages": [],
+  "metrics": [],
   "artifacts": [
     {
       "name": "simulation.sql",
@@ -114,8 +98,13 @@ This container:
       "eplusout_err": "/tmp/run/eplusout.err"
     },
     "metrics": {
-      "electricity_kwh": 1234.5,
-      "energy_use_intensity_kwh_m2": 18.7
+      "site_electricity_kwh": 1234.5,
+      "site_natural_gas_kwh": 250.0,
+      "site_district_cooling_kwh": 0.0,
+      "site_district_heating_kwh": 100.0,
+      "site_other_fuels_kwh": 0.0,
+      "site_eui_kwh_m2": 18.7,
+      "simulated_conditioned_area_m2": 84.7
     },
     "logs": {
       "stdout_tail": "...",
@@ -124,10 +113,36 @@ This container:
     },
     "energyplus_returncode": 0,
     "execution_seconds": 330.5,
-    "invocation_mode": "cli"
+    "invocation_mode": "cli",
+    "energyplus_binary_version": "25.2.0",
+    "energyplus_binary_build": "cf7368216c",
+    "idd_version": "25.2.0",
+    "idd_build": "cf7368216c",
+    "idd_path": "/opt/energyplus/Energy+.idd",
+    "idf_version": "25.2",
+    "version_match": true,
+    "completed_successfully": true,
+    "warning_count": 0,
+    "severe_count": 0,
+    "fatal_count": 0,
+    "review_issue_count": 0,
+    "has_sql_output": true,
+    "has_err_output": true,
+    "has_csv_output": true,
+    "has_eso_output": true
   }
 }
 ```
+
+`run_simulation=false` selects conversion-only preflight and does not require
+weather or SQL-backed metrics. The backend always passes the bundled
+`Energy+.idd` explicitly and compares the model, binary, and IDD at major/minor
+precision.
+
+Modeled site EUI sums every GJ-valued `Total End Uses` fuel column before
+dividing by the reported simulation area. This includes electricity, natural
+gas, district energy, and uncommon fuels such as propane or fuel oil. It is not
+a measured or weather-normalized CBPS WNEUI/EUIt value.
 
 ## Building and Deploying
 

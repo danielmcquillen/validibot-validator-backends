@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased - EnergyPlus 0.16.0
+
+### Added
+
+- Report the exact EnergyPlus binary, IDD, input-model version match, execution
+  result, issue counts, and artifact availability as reviewer-facing evidence.
+- Support conversion-only preflight runs without weather, selected Validibot
+  IDF/epJSON review checks, private working-copy timestep normalization, and
+  standard or LEED-readiness evidence profiles.
+- Classify common EnergyPlus errors into stable reviewer codes and tags while
+  retaining warning, severe, and fatal counts independently of presentation
+  filtering.
+
+### Fixed
+
+- Calculate modeled site EUI from every GJ-valued site fuel, including natural
+  gas, district heating/cooling, propane, fuel oils, and other applicable fuels,
+  rather than electricity alone.
+- Populate the declared end-use, unmet-hours, peak-demand, area, and optional
+  window metrics, returning explicit nulls where EnergyPlus did not emit data.
+
+### Release note
+
+- Publish `validibot-shared` 0.24.0 first. Then update the EnergyPlus inventory,
+  requirements, generated lock, and SBOM together before releasing the backend
+  image as 0.16.0.
+
 ## Backend releases: EnergyPlus 0.15.5; FMU/SHACL/Schematron 0.15.4; Portfolio Manager 0.16.4 - 2026-08-02
 
 ### Changed
