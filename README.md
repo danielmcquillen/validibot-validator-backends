@@ -233,13 +233,13 @@ Current independently offered versions are:
 
 | Backend | Version |
 | --- | --- |
-| EnergyPlus | `0.16.0` |
+| EnergyPlus | `0.16.1` |
 | FMU | `0.15.5` |
 | SHACL | `0.15.5` |
 | Schematron | `0.15.5` |
 | Portfolio Manager | `0.16.5` |
 
-Release tags are backend-specific, such as `energyplus-v0.16.0` and
+Release tags are backend-specific, such as `energyplus-v0.16.1` and
 `portfolio_manager-v0.16.5`. A failed or published tag is never moved or
 reused; the correction receives a new backend version.
 

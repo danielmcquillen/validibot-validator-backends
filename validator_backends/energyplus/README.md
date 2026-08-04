@@ -7,7 +7,7 @@ Container for running [EnergyPlus™](https://energyplus.net/) simulations as pa
 This container:
 1. Downloads `input.json` (EnergyPlusInputEnvelope) from storage
 2. Downloads the IDF/epJSON model and, for full runs, an EPW weather file
-3. Creates a private normalized model copy and runs selected review checks
+3. Creates a private normalized model copy and runs selected modelling-review checks
 4. Runs a full EnergyPlus simulation or conversion-only preflight
 5. Extracts review evidence and available SQL metrics
 6. Creates and uploads `output.json` plus run artifacts
@@ -53,7 +53,7 @@ This container:
   "inputs": {
     "timestep_per_hour": 4,
     "invocation_mode": "cli",
-    "idf_checks": ["duplicate-names", "hvac-sizing", "schedule-coverage"],
+    "idf_checks": ["hvac-sizing", "schedule-coverage"],
     "run_simulation": true,
     "review_profile": "standard"
   },
@@ -137,7 +137,21 @@ This container:
 `run_simulation=false` selects conversion-only preflight and does not require
 weather or SQL-backed metrics. The backend always passes the bundled
 `Energy+.idd` explicitly and compares the model, binary, and IDD at major/minor
-precision.
+precision. EnergyPlus owns IDF/IDD validation in both modes. Validibot merges
+native diagnostics from `eplusout.err`, stdout, and stderr into findings and
+adds an explicit failure finding if a nonzero EnergyPlus exit has no diagnostic.
+
+For every full simulation, the private normalized IDF or epJSON copy also
+enforces `Output:SQLite` with `SimpleAndTabular` and unconverted SI units. It
+preserves author-selected summary reports while ensuring that
+`AnnualBuildingUtilityPerformanceSummary` and
+`DemandEndUseComponentsSummary` are requested. EnergyPlus has no CLI switch
+for SQLite output, so this normalization guarantees the tabular contract used
+by post-processing without modifying the submitted model.
+
+The legacy `duplicate-names` review-check value remains accepted as a no-op so
+saved workflows continue to run. Duplicate-name findings now come only from
+EnergyPlus's IDD-aware native validation.
 
 Modeled site EUI sums every GJ-valued `Total End Uses` fuel column before
 dividing by the reported simulation area. This includes electricity, natural

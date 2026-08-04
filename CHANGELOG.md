@@ -5,7 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased - EnergyPlus 0.16.0; FMU/SHACL/Schematron 0.15.5; Portfolio Manager 0.16.5
+## Unreleased - EnergyPlus 0.16.1; FMU/SHACL/Schematron 0.15.5; Portfolio Manager 0.16.5
+
+### Changed
+
+- Delegate IDF/IDD validity, including duplicate object-name rules, to the
+  selected EnergyPlus binary and IDD. The legacy `duplicate-names` review-check
+  value remains a compatible no-op for saved workflows.
+- Merge native EnergyPlus diagnostics from `eplusout.err`, stdout, and stderr
+  into findings in both full-simulation and conversion-only modes.
+- Normalize every full-simulation IDF or epJSON working copy to emit
+  `SimpleAndTabular` SQLite data in SI units and include the summary reports
+  required for EUI and demand post-processing.
+
+### Fixed
+
+- Avoid false duplicate-name findings for repeatable objects whose first field
+  is not an IDD-defined unique name, including `Output:Variable` objects using
+  the `*` key.
+- Emit an explicit execution-failure finding when EnergyPlus exits nonzero
+  without producing a specific error diagnostic.
+
+## Backend releases: EnergyPlus 0.16.0; FMU/SHACL/Schematron 0.15.5; Portfolio Manager 0.16.5 - 2026-08-03
 
 ### Changed
 

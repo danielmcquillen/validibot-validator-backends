@@ -1,12 +1,13 @@
 """
 Unit tests for EnergyPlus container helpers.
 
-Covers artifact type inference, GCS URI rewriting, tabular metric extraction,
-and output variable extraction (window envelope metrics).
+Covers artifact type inference, GCS URI rewriting, private model normalization,
+tabular metric extraction, and output variable extraction (window metrics).
 """
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
@@ -536,10 +537,17 @@ def test_timestep_normalization_never_mutates_submitted_idf(tmp_path) -> None:
     original = "Version, 25.2;\nTimestep, 4;\n"
     source.write_text(original, encoding="utf-8")
 
-    normalized = runner._prepare_model_working_copy(source, tmp_path, 12)  # type: ignore[attr-defined]
+    normalized = runner._prepare_model_working_copy(  # type: ignore[attr-defined]
+        source,
+        tmp_path,
+        12,
+        run_simulation=False,
+    )
 
     assert source.read_text(encoding="utf-8") == original
-    assert "Timestep,\n  12;" in normalized.read_text(encoding="utf-8")
+    normalized_text = normalized.read_text(encoding="utf-8")
+    assert "Timestep,\n  12;" in normalized_text
+    assert "Output:SQLite" not in normalized_text
 
 
 def test_timestep_normalization_updates_epjson_working_copy(tmp_path) -> None:
@@ -551,22 +559,158 @@ def test_timestep_normalization_updates_epjson_working_copy(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    normalized = runner._prepare_model_working_copy(source, tmp_path, 6)  # type: ignore[attr-defined]
+    normalized = runner._prepare_model_working_copy(  # type: ignore[attr-defined]
+        source,
+        tmp_path,
+        6,
+        run_simulation=False,
+    )
     assert '"number_of_timesteps_per_hour": 6' in normalized.read_text(
         encoding="utf-8",
     )
+    assert '"Output:SQLite"' not in normalized.read_text(encoding="utf-8")
     assert '"number_of_timesteps_per_hour":4' in source.read_text(encoding="utf-8")
 
 
-def test_selected_idf_checks_emit_stable_review_codes(tmp_path) -> None:
-    """Duplicate, sizing, and schedule findings should be assertion-friendly."""
+def test_full_simulation_adds_required_idf_sql_reports(tmp_path) -> None:
+    """Every full IDF run must emit the tabular SQL needed for post-processing."""
+
+    source = tmp_path / "source.idf"
+    original = "Version, 25.1;\nTimestep, 4;\n"
+    source.write_text(original, encoding="utf-8")
+
+    normalized = runner._prepare_model_working_copy(  # type: ignore[attr-defined]
+        source,
+        tmp_path,
+        4,
+        run_simulation=True,
+    )
+
+    normalized_text = normalized.read_text(encoding="utf-8")
+    assert source.read_text(encoding="utf-8") == original
+    assert runner._idf_object_span(  # type: ignore[attr-defined]
+        normalized_text,
+        "Output:SQLite",
+    )[2] == ["SimpleAndTabular", "None"]
+    assert runner._idf_object_span(  # type: ignore[attr-defined]
+        normalized_text,
+        "Output:Table:SummaryReports",
+    )[2] == [
+        "AnnualBuildingUtilityPerformanceSummary",
+        "DemandEndUseComponentsSummary",
+    ]
+
+
+def test_idf_sql_normalization_upgrades_and_merges_existing_output(tmp_path) -> None:
+    """Required SQL settings must preserve author-selected summary reports."""
+
+    source = tmp_path / "source.idf"
+    source.write_text(
+        """
+        Version, 25.1;
+        Output:SQLite,
+          Simple,
+          InchPound;
+        Output:Table:SummaryReports,
+          EnvelopeSummary; !- Report 1 Name
+        """,
+        encoding="utf-8",
+    )
+
+    normalized = runner._prepare_model_working_copy(  # type: ignore[attr-defined]
+        source,
+        tmp_path,
+        4,
+        run_simulation=True,
+    )
+    normalized_text = normalized.read_text(encoding="utf-8")
+
+    assert normalized_text.casefold().count("output:sqlite,") == 1
+    assert "Report 1 Name" not in normalized_text
+    assert runner._idf_object_span(  # type: ignore[attr-defined]
+        normalized_text,
+        "Output:SQLite",
+    )[2] == ["SimpleAndTabular", "None"]
+    assert runner._idf_object_span(  # type: ignore[attr-defined]
+        normalized_text,
+        "Output:Table:SummaryReports",
+    )[2] == [
+        "EnvelopeSummary",
+        "AnnualBuildingUtilityPerformanceSummary",
+        "DemandEndUseComponentsSummary",
+    ]
+
+
+def test_idf_all_summary_already_satisfies_required_reports(tmp_path) -> None:
+    """AllSummary models should not receive redundant explicit summary names."""
+
+    source = tmp_path / "source.idf"
+    source.write_text(
+        "Version, 25.1;\nOutput:Table:SummaryReports, AllSummary;\n",
+        encoding="utf-8",
+    )
+
+    normalized = runner._prepare_model_working_copy(  # type: ignore[attr-defined]
+        source,
+        tmp_path,
+        4,
+        run_simulation=True,
+    )
+
+    assert runner._idf_object_span(  # type: ignore[attr-defined]
+        normalized.read_text(encoding="utf-8"),
+        "Output:Table:SummaryReports",
+    )[2] == ["AllSummary"]
+
+
+def test_full_simulation_normalizes_epjson_sql_reports(tmp_path) -> None:
+    """epJSON runs must receive the same SQL contract while preserving reports."""
+
+    source = tmp_path / "source.epjson"
+    source.write_text(
+        json.dumps(
+            {
+                "Version": {"Version 1": {"version_identifier": "25.1"}},
+                "Output:SQLite": {
+                    "Author Output": {
+                        "option_type": "Simple",
+                        "unit_conversion_for_tabular_data": "InchPound",
+                    }
+                },
+                "Output:Table:SummaryReports": {
+                    "Author Reports": {"reports": [{"report_name": "EnvelopeSummary"}]}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    normalized = runner._prepare_model_working_copy(  # type: ignore[attr-defined]
+        source,
+        tmp_path,
+        6,
+        run_simulation=True,
+    )
+    payload = json.loads(normalized.read_text(encoding="utf-8"))
+
+    assert payload["Output:SQLite"]["Author Output"] == {
+        "option_type": "SimpleAndTabular",
+        "unit_conversion_for_tabular_data": "None",
+    }
+    assert payload["Output:Table:SummaryReports"]["Author Reports"]["reports"] == [
+        {"report_name": "EnvelopeSummary"},
+        {"report_name": "AnnualBuildingUtilityPerformanceSummary"},
+        {"report_name": "DemandEndUseComponentsSummary"},
+    ]
+
+
+def test_selected_model_review_checks_emit_stable_codes(tmp_path) -> None:
+    """Optional sizing and schedule findings should remain assertion-friendly."""
     model = tmp_path / "review.idf"
     model.write_text(
         """
         Version, 25.2;
         SimulationControl, No, No;
-        Schedule:Day:Constant, Workday, Any Number, 1;
-        Schedule:Day:Constant, workday, Any Number, 0;
         Schedule:Week:Daily, Broken Week, Workday, Workday;
         """,
         encoding="utf-8",
@@ -574,15 +718,30 @@ def test_selected_idf_checks_emit_stable_review_codes(tmp_path) -> None:
 
     messages = runner.run_idf_checks(
         model,
-        ["duplicate-names", "hvac-sizing", "schedule-coverage"],
+        ["hvac-sizing", "schedule-coverage"],
     )
 
     assert {message["code"] for message in messages} == {
-        "ENERGYPLUS_REVIEW_DUPLICATE_OBJECT_NAME",
         "ENERGYPLUS_REVIEW_HVAC_SIZING_DISABLED",
         "ENERGYPLUS_REVIEW_SCHEDULE_COVERAGE",
     }
     assert all("energyplus-review" in message["tags"] for message in messages)
+
+
+def test_legacy_duplicate_name_check_is_a_compatible_noop(tmp_path) -> None:
+    """Saved workflows must defer duplicate identity rules to native EnergyPlus."""
+
+    model = tmp_path / "review.idf"
+    model.write_text(
+        """
+        Version, 25.2;
+        Output:Variable, *, Zone Mean Air Temperature, hourly;
+        Output:Variable, *, Zone Air Relative Humidity, hourly;
+        """,
+        encoding="utf-8",
+    )
+
+    assert runner.run_idf_checks(model, ["duplicate-names"]) == []
 
 
 def test_err_parser_counts_and_classifies_reviewer_issues(tmp_path) -> None:
@@ -606,6 +765,77 @@ def test_err_parser_counts_and_classifies_reviewer_issues(tmp_path) -> None:
         "ENERGYPLUS_REVIEW_CONVERGENCE_RUNTIME",
     }
     assert all("energyplus-review" in message["tags"] for message in messages)
+
+
+def test_native_diagnostics_merge_err_stdout_and_stderr(tmp_path) -> None:
+    """CLI-only conversion diagnostics must become findings alongside `.err`."""
+
+    err = tmp_path / "eplusout.err"
+    err.write_text(
+        """
+        ** Warning ** Duplicate object name was found
+        ** Severe  ** Referenced object COIL-1 was not found
+        """,
+        encoding="utf-8",
+    )
+    stdout = "WARNING: Input conversion used a deprecated field\n"
+    stderr = (
+        "ERROR: Referenced object COIL-1 was not found\n"
+        "FATAL: Input conversion could not continue\n"
+    )
+
+    messages, counts = runner.parse_energyplus_diagnostics(
+        err,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert counts == (2, 1, 1)
+    assert len(messages) == 4
+    assert {message["code"] for message in messages} == {
+        "ENERGYPLUS_REVIEW_DUPLICATE_OBJECT_NAME",
+        "ENERGYPLUS_REVIEW_INVALID_OBJECT_REFERENCE",
+        "ENERGYPLUS_REVIEW_DEPRECATED_OBJECT_FIELD",
+        "ENERGYPLUS_FATAL",
+    }
+
+
+def test_plain_stream_diagnostics_work_without_err_file() -> None:
+    """Early native failures should remain visible when no `.err` is created."""
+
+    messages, counts = runner.parse_energyplus_diagnostics(
+        None,
+        stdout=(
+            "EnergyPlus ERROR: Could not open the input data dictionary\n"
+            "**FATAL:Errors occurred while processing the input file\n"
+        ),
+        stderr="[WARNING]: Falling back was not possible\n",
+    )
+
+    assert counts == (1, 1, 1)
+    assert [message["severity"] for message in messages] == ["error", "error", "warning"]
+    assert messages[0]["code"] == "ENERGYPLUS_SEVERE"
+    assert messages[1]["code"] == "ENERGYPLUS_FATAL"
+
+
+def test_nonzero_exit_without_native_error_gets_fallback_finding() -> None:
+    """Every unsuccessful EnergyPlus process must explain the failed verdict."""
+
+    messages = runner._ensure_execution_failure_diagnostic(  # type: ignore[attr-defined]
+        [
+            {
+                "severity": "warning",
+                "text": "A warning alone does not explain the failed process.",
+            }
+        ],
+        returncode=2,
+        run_simulation=False,
+    )
+
+    assert messages[-1]["code"] == "ENERGYPLUS_EXECUTION_FAILED"
+    assert messages[-1]["severity"] == "error"
+    assert "conversion-only preflight" in messages[-1]["text"]
+    assert "return code 2" in messages[-1]["text"]
 
 
 def test_err_counts_prefer_energyplus_terminal_summary(tmp_path) -> None:

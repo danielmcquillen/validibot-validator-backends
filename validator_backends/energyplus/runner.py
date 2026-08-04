@@ -36,6 +36,19 @@ logger = logging.getLogger(__name__)
 
 GJ_TO_KWH = 1_000_000_000.0 / 3_600_000.0
 
+REQUIRED_SQL_SUMMARY_REPORTS = (
+    "AnnualBuildingUtilityPerformanceSummary",
+    "DemandEndUseComponentsSummary",
+)
+ALL_SUMMARY_REPORTS = frozenset(
+    {
+        "allsummary",
+        "allsummaryandmonthly",
+        "allsummaryandsizingperiod",
+        "allsummarymonthlyandsizingperiod",
+    }
+)
+
 
 @dataclass(frozen=True)
 class EnergyPlusInstallationEvidence:
@@ -392,12 +405,175 @@ def _versions_match(
     return model_pair == binary_pair == idd_pair
 
 
+def _idf_object_span(
+    model_text: str,
+    object_type: str,
+) -> tuple[int, int, list[str]] | None:
+    """Find one IDF object without treating comment semicolons as delimiters.
+
+    The returned span begins at the object-type token and ends immediately
+    after its terminating semicolon. Leading comments and indentation remain
+    outside the span so normalization preserves the surrounding source context.
+    """
+
+    segment_start = 0
+    in_comment = False
+    for index, character in enumerate(model_text):
+        if in_comment:
+            if character in "\r\n":
+                in_comment = False
+            continue
+        if character == "!":
+            in_comment = True
+            continue
+        if character != ";":
+            continue
+
+        raw_segment = model_text[segment_start : index + 1]
+        decommented_lines: list[str] = []
+        object_start: int | None = None
+        line_offset = 0
+        for line in raw_segment.splitlines(keepends=True):
+            code = line.split("!", 1)[0]
+            decommented_lines.append(code)
+            if object_start is None:
+                token_match = re.search(r"\S", code)
+                if token_match:
+                    object_start = segment_start + line_offset + token_match.start()
+            line_offset += len(line)
+
+        decommented = "".join(decommented_lines)
+        parts = [part.strip() for part in re.split(r"[,;]", decommented)]
+        if parts and parts[0].casefold() == object_type.casefold():
+            fields = [part for part in parts[1:] if part]
+            if object_start is None:  # pragma: no cover - guarded by parsed object type
+                return None
+            object_end = index + 1
+            trailing_comment = re.match(r"[ \t]*![^\r\n]*", model_text[object_end:])
+            if trailing_comment:
+                object_end += trailing_comment.end()
+            return object_start, object_end, fields
+        segment_start = index + 1
+
+    return None
+
+
+def _format_idf_object(object_type: str, fields: list[str]) -> str:
+    """Render a small canonical IDF object for the private working copy."""
+
+    lines = [f"{object_type},"]
+    for index, field in enumerate(fields):
+        terminator = ";" if index == len(fields) - 1 else ","
+        lines.append(f"  {field}{terminator}")
+    return "\n".join(lines)
+
+
+def _replace_or_append_idf_object(
+    model_text: str,
+    object_type: str,
+    fields: list[str],
+) -> str:
+    """Replace the first matching IDF object or append it when absent."""
+
+    rendered = _format_idf_object(object_type, fields)
+    existing = _idf_object_span(model_text, object_type)
+    if existing is None:
+        return model_text.rstrip() + f"\n\n{rendered}\n"
+    start, end, _existing_fields = existing
+    return f"{model_text[:start]}{rendered}{model_text[end:]}"
+
+
+def _ensure_idf_sql_reporting(model_text: str) -> str:
+    """Guarantee stable SI-unit tabular SQLite reports in an IDF model."""
+
+    model_text = _replace_or_append_idf_object(
+        model_text,
+        "Output:SQLite",
+        ["SimpleAndTabular", "None"],
+    )
+
+    existing = _idf_object_span(model_text, "Output:Table:SummaryReports")
+    reports = list(existing[2]) if existing is not None else []
+    normalized_reports = {report.casefold() for report in reports}
+    if not normalized_reports.intersection(ALL_SUMMARY_REPORTS):
+        for required_report in REQUIRED_SQL_SUMMARY_REPORTS:
+            if required_report.casefold() not in normalized_reports:
+                reports.append(required_report)
+                normalized_reports.add(required_report.casefold())
+    return _replace_or_append_idf_object(
+        model_text,
+        "Output:Table:SummaryReports",
+        reports,
+    )
+
+
+def _first_epjson_instance(
+    payload: dict[str, Any],
+    object_type: str,
+    default_name: str,
+) -> dict[str, Any]:
+    """Return or create the first instance of a singleton epJSON object."""
+
+    instances = payload.get(object_type)
+    if not isinstance(instances, dict) or not instances:
+        instance: dict[str, Any] = {}
+        payload[object_type] = {default_name: instance}
+        return instance
+
+    first_name = next(iter(instances))
+    instance = instances[first_name]
+    if not isinstance(instance, dict):
+        instance = {}
+        instances[first_name] = instance
+    return instance
+
+
+def _ensure_epjson_sql_reporting(payload: dict[str, Any]) -> None:
+    """Guarantee stable SI-unit tabular SQLite reports in an epJSON model."""
+
+    sqlite_output = _first_epjson_instance(
+        payload,
+        "Output:SQLite",
+        "Validibot SQLite Output",
+    )
+    sqlite_output["option_type"] = "SimpleAndTabular"
+    sqlite_output["unit_conversion_for_tabular_data"] = "None"
+
+    summary_output = _first_epjson_instance(
+        payload,
+        "Output:Table:SummaryReports",
+        "Validibot Summary Reports",
+    )
+    reports = summary_output.get("reports")
+    if not isinstance(reports, list):
+        reports = []
+        summary_output["reports"] = reports
+
+    normalized_reports = {
+        str(report.get("report_name", "")).casefold()
+        for report in reports
+        if isinstance(report, dict)
+    }
+    if not normalized_reports.intersection(ALL_SUMMARY_REPORTS):
+        for required_report in REQUIRED_SQL_SUMMARY_REPORTS:
+            if required_report.casefold() not in normalized_reports:
+                reports.append({"report_name": required_report})
+                normalized_reports.add(required_report.casefold())
+
+
 def _prepare_model_working_copy(
     model_file: Path,
     work_dir: Path,
     timestep_per_hour: int,
+    *,
+    run_simulation: bool,
 ) -> Path:
-    """Create and normalize a private model copy without changing the source."""
+    """Create and normalize a private model copy without changing the source.
+
+    Full simulations receive the SQLite and tabular-summary declarations that
+    Validibot's post-processing contract requires. Conversion-only preflight
+    changes only the timestep because EnergyPlus will not emit simulation SQL.
+    """
 
     suffix = model_file.suffix.lower()
     normalized_suffix = ".epjson" if suffix in {".epjson", ".json"} else ".idf"
@@ -416,6 +592,8 @@ def _prepare_model_working_copy(
         if not isinstance(timestep_objects[first], dict):
             timestep_objects[first] = {}
         timestep_objects[first]["number_of_timesteps_per_hour"] = timestep_per_hour
+        if run_simulation:
+            _ensure_epjson_sql_reporting(payload)
         working_model.write_text(
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -432,6 +610,8 @@ def _prepare_model_working_copy(
         content = timestep_pattern.sub(replacement, content, count=1)
     else:
         content = content.rstrip() + replacement + "\n"
+    if run_simulation:
+        content = _ensure_idf_sql_reporting(content)
     working_model.write_text(content, encoding="utf-8")
     return working_model
 
@@ -465,47 +645,6 @@ def _review_message(
         "category": category,
         "tags": ["energyplus-review", category],
     }
-
-
-def _check_duplicate_names(
-    idf_objects: list[tuple[str, list[str]]] | None,
-    epjson: dict[str, Any] | None,
-) -> list[dict[str, Any]]:
-    """Find duplicate object names using EnergyPlus case-insensitive identity."""
-
-    duplicates: list[str] = []
-    if idf_objects is not None:
-        seen: set[tuple[str, str]] = set()
-        for object_type, fields in idf_objects:
-            if not fields or not fields[0]:
-                continue
-            key = (object_type.casefold(), fields[0].casefold())
-            if key in seen:
-                duplicates.append(f"{object_type}={fields[0]}")
-            seen.add(key)
-    elif epjson is not None:
-        for object_type, instances in epjson.items():
-            if not isinstance(instances, dict):
-                continue
-            seen_names: set[str] = set()
-            for name in instances:
-                normalized = str(name).casefold()
-                if normalized in seen_names:
-                    duplicates.append(f"{object_type}={name}")
-                seen_names.add(normalized)
-
-    if not duplicates:
-        return []
-    preview = ", ".join(duplicates[:5])
-    suffix = "" if len(duplicates) <= 5 else f" (+{len(duplicates) - 5} more)"
-    return [
-        _review_message(
-            severity="error",
-            code="ENERGYPLUS_REVIEW_DUPLICATE_OBJECT_NAME",
-            text=f"Duplicate EnergyPlus object names detected: {preview}{suffix}",
-            category="duplicate-object-names",
-        ),
-    ]
 
 
 def _check_hvac_sizing(
@@ -597,9 +736,16 @@ def _check_schedule_coverage(
 
 
 def run_idf_checks(model_file: Path, checks: list[str]) -> list[dict[str, Any]]:
-    """Run selected Validibot checks against the normalized model copy."""
+    """Run optional Validibot modelling-review checks.
 
-    if not checks:
+    ``duplicate-names`` remains accepted by the shared wire contract so saved
+    workflows created before EnergyPlus 0.16.1 continue to execute. It is a
+    deliberate no-op here: object identity is governed by the selected IDD,
+    and EnergyPlus's native diagnostic is the authoritative result.
+    """
+
+    active_checks = [check for check in checks if check != "duplicate-names"]
+    if not active_checks:
         return []
     try:
         if model_file.suffix.lower() == ".epjson":
@@ -622,12 +768,11 @@ def run_idf_checks(model_file: Path, checks: list[str]) -> list[dict[str, Any]]:
         ]
 
     check_functions = {
-        "duplicate-names": _check_duplicate_names,
         "hvac-sizing": _check_hvac_sizing,
         "schedule-coverage": _check_schedule_coverage,
     }
     messages: list[dict[str, Any]] = []
-    for check in checks:
+    for check in active_checks:
         check_function = check_functions.get(check)
         if check_function is None:
             messages.append(
@@ -685,6 +830,7 @@ def run_energyplus_simulation(
         model_file,
         work_dir,
         input_envelope.inputs.timestep_per_hour,
+        run_simulation=input_envelope.inputs.run_simulation,
     )
     idf_version = _parse_model_version(working_model)
     version_match = _versions_match(
@@ -732,11 +878,22 @@ def run_energyplus_simulation(
         err_tail=_read_err_tail(err_path),
     )
 
-    # Parse error messages from .err file
-    logger.info("Parsing error messages...")
-    parsed_messages = parse_err_file(err_path)
-    warning_count, severe_count, fatal_count = _count_err_issues(err_path)
-    parsed_messages = [*review_messages, *parsed_messages]
+    # EnergyPlus normally writes diagnostics to eplusout.err, but early CLI
+    # and conversion failures can appear only on stdout/stderr. Merge every
+    # native source before adding Validibot-authored review/profile messages.
+    logger.info("Parsing native EnergyPlus diagnostics...")
+    native_messages, issue_counts = parse_energyplus_diagnostics(
+        err_path,
+        stdout=stdout,
+        stderr=stderr,
+    )
+    warning_count, severe_count, fatal_count = issue_counts
+    native_messages = _ensure_execution_failure_diagnostic(
+        native_messages,
+        returncode=returncode,
+        run_simulation=input_envelope.inputs.run_simulation,
+    )
+    parsed_messages = [*review_messages, *native_messages]
 
     profile_messages = _profile_required_output_messages(
         review_profile=input_envelope.inputs.review_profile,
@@ -751,7 +908,7 @@ def run_energyplus_simulation(
     )
     completed_successfully = returncode == 0 and fatal_count == 0
     if parsed_messages:
-        logger.info("Found %d error/warning messages in .err file", len(parsed_messages))
+        logger.info("Found %d EnergyPlus/review diagnostic messages", len(parsed_messages))
 
     logger.info(
         "Simulation complete (returncode=%d, duration=%.2fs)",
@@ -1411,6 +1568,163 @@ def _classify_err_message(message: dict[str, Any]) -> dict[str, Any]:
     return message
 
 
+_MARKER_DIAGNOSTIC_RE = re.compile(
+    r"^\s*\*\*\s*(Warning|Severe|Fatal)\s*\*\*\s*(.*)$",
+    re.IGNORECASE,
+)
+_CONTINUATION_DIAGNOSTIC_RE = re.compile(
+    r"^\s*\*\*\s*~~~\s*\*\*\s*(.*)$",
+    re.IGNORECASE,
+)
+_PLAIN_DIAGNOSTIC_RE = re.compile(
+    r"^\s*(?:EnergyPlus\s+)?(?:\*{2}\s*)?(?:\[(Warning|Severe|Fatal|Error)\]|"
+    r"(Warning|Severe|Fatal|Error))\s*(?::|[-\u2013\u2014])\s*(.+?)\s*$",
+    re.IGNORECASE,
+)
+_TERMINAL_SUMMARY_RE = re.compile(
+    r"EnergyPlus\s+(?:Completed Successfully|Terminated).*?"
+    r"(\d+)\s+Warning(?:s)?;\s*(\d+)\s+Severe Errors?",
+    re.IGNORECASE,
+)
+
+
+def _native_diagnostic_message(kind: str, text: str) -> dict[str, Any]:
+    """Build and classify one EnergyPlus-authored diagnostic message."""
+
+    normalized_kind = kind.casefold()
+    if normalized_kind == "warning":
+        severity = "warning"
+        code = "ENERGYPLUS_WARNING"
+    elif normalized_kind == "fatal":
+        severity = "error"
+        code = "ENERGYPLUS_FATAL"
+    else:
+        normalized_kind = "severe"
+        severity = "error"
+        code = "ENERGYPLUS_SEVERE"
+    return _classify_err_message(
+        {
+            "severity": severity,
+            "text": text.strip(),
+            "code": code,
+            "kind": normalized_kind,
+        }
+    )
+
+
+def _parse_energyplus_diagnostic_text(content: str) -> list[dict[str, Any]]:
+    """Extract marked and plain CLI diagnostics from EnergyPlus text."""
+
+    messages: list[dict[str, Any]] = []
+    current_kind: str | None = None
+    current_text = ""
+    current_is_plain = False
+
+    def save_current() -> None:
+        nonlocal current_is_plain, current_kind, current_text
+        if current_kind is not None and current_text.strip():
+            messages.append(_native_diagnostic_message(current_kind, current_text))
+        current_kind = None
+        current_text = ""
+        current_is_plain = False
+
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("*************"):
+            save_current()
+            continue
+        if "Summary of Errors" in line or "Reference severe error" in line:
+            save_current()
+            continue
+
+        marker_match = _MARKER_DIAGNOSTIC_RE.match(line)
+        if marker_match:
+            save_current()
+            current_kind = marker_match.group(1)
+            current_text = marker_match.group(2).strip()
+            current_is_plain = False
+            continue
+
+        plain_match = _PLAIN_DIAGNOSTIC_RE.match(line)
+        if plain_match:
+            save_current()
+            current_kind = plain_match.group(1) or plain_match.group(2)
+            current_text = plain_match.group(3).strip()
+            current_is_plain = True
+            continue
+
+        continuation_match = _CONTINUATION_DIAGNOSTIC_RE.match(line)
+        if current_kind is not None and continuation_match:
+            continuation = continuation_match.group(1).strip()
+            if continuation:
+                current_text = f"{current_text} {continuation}".strip()
+            continue
+
+        if current_kind is not None and current_is_plain and stripped:
+            save_current()
+            continue
+
+        if current_kind is not None and stripped:
+            current_text = f"{current_text} {stripped}".strip()
+
+    save_current()
+    return messages
+
+
+def _diagnostic_identity(message: dict[str, Any]) -> tuple[str, str]:
+    """Return a source-independent identity for diagnostic deduplication."""
+
+    kind = str(message.get("kind", message.get("severity", ""))).casefold()
+    text = re.sub(r"\s+", " ", str(message.get("text", ""))).strip().casefold()
+    return kind, text
+
+
+def _deduplicate_diagnostics(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep one finding when EnergyPlus repeats a diagnostic across outputs."""
+
+    deduplicated: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for message in messages:
+        identity = _diagnostic_identity(message)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        deduplicated.append(message)
+    return deduplicated
+
+
+def _count_diagnostic_text_issues(content: str) -> tuple[int, int, int]:
+    """Count EnergyPlus issue markers, including plain CLI-only diagnostics."""
+
+    warning_count = 0
+    severe_count = 0
+    fatal_count = 0
+    for line in content.splitlines():
+        marker_match = _MARKER_DIAGNOSTIC_RE.match(line)
+        plain_match = _PLAIN_DIAGNOSTIC_RE.match(line)
+        if marker_match:
+            kind = marker_match.group(1).casefold()
+        elif plain_match:
+            kind = (plain_match.group(1) or plain_match.group(2)).casefold()
+        else:
+            continue
+        if kind == "warning":
+            warning_count += 1
+        elif kind == "fatal":
+            fatal_count += 1
+        else:
+            severe_count += 1
+
+    summaries = _TERMINAL_SUMMARY_RE.findall(content)
+    if summaries:
+        summary_warning_count, summary_severe_count = summaries[-1]
+        warning_count = max(warning_count, int(summary_warning_count))
+        severe_count = max(severe_count, int(summary_severe_count))
+    return warning_count, severe_count, fatal_count
+
+
 def _count_err_issues(err_path: Path | None) -> tuple[int, int, int]:
     """Count warnings, severe errors, and fatal markers without UI deduping.
 
@@ -1425,22 +1739,7 @@ def _count_err_issues(err_path: Path | None) -> tuple[int, int, int]:
         content = err_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return 0, 0, 0
-    patterns = (
-        re.compile(r"^\s*\*\*\s*Warning\s*\*\*", re.IGNORECASE | re.MULTILINE),
-        re.compile(r"^\s*\*\*\s*Severe\s*\*\*", re.IGNORECASE | re.MULTILINE),
-        re.compile(r"^\s*\*\*\s*Fatal\s*\*\*", re.IGNORECASE | re.MULTILINE),
-    )
-    marker_counts = tuple(len(pattern.findall(content)) for pattern in patterns)
-    summaries = re.findall(
-        r"EnergyPlus\s+(?:Completed Successfully|Terminated).*?"
-        r"(\d+)\s+Warning(?:s)?;\s*(\d+)\s+Severe Errors",
-        content,
-        re.IGNORECASE,
-    )
-    if not summaries:
-        return marker_counts  # type: ignore[return-value]
-    warning_count, severe_count = summaries[-1]
-    return int(warning_count), int(severe_count), marker_counts[2]
+    return _count_diagnostic_text_issues(content)
 
 
 def _profile_required_output_messages(
@@ -1518,7 +1817,35 @@ def _profile_required_output_messages(
     return messages
 
 
-def parse_err_file(err_path: Path | None) -> list[dict]:
+def _ensure_execution_failure_diagnostic(
+    messages: list[dict[str, Any]],
+    *,
+    returncode: int,
+    run_simulation: bool,
+) -> list[dict[str, Any]]:
+    """Explain a nonzero EnergyPlus exit when native output does not."""
+
+    if returncode == 0 or any(message.get("severity") == "error" for message in messages):
+        return messages
+    mode = "simulation" if run_simulation else "conversion-only preflight"
+    return [
+        *messages,
+        {
+            "severity": "error",
+            "code": "ENERGYPLUS_EXECUTION_FAILED",
+            "text": (
+                f"EnergyPlus {mode} exited with return code {returncode} "
+                "without reporting a specific error. Review the captured "
+                "EnergyPlus logs for additional context."
+            ),
+            "kind": "execution",
+            "category": "execution-failure",
+            "tags": ["energyplus", "execution-failure"],
+        },
+    ]
+
+
+def parse_err_file(err_path: Path | None) -> list[dict[str, Any]]:
     """
     Parse EnergyPlus .err file and extract error/warning messages.
 
@@ -1539,80 +1866,73 @@ def parse_err_file(err_path: Path | None) -> list[dict]:
     if err_path is None or not err_path.exists():
         return []
 
-    messages: list[dict] = []
-
     try:
         content = err_path.read_text(encoding="utf-8", errors="replace")
-    except Exception as e:
-        logger.warning("Failed to read err file for parsing: %s", e)
+    except OSError as exc:
+        logger.warning("Failed to read err file for parsing: %s", exc)
         return []
 
-    # Pattern to match EnergyPlus error markers
-    # Examples:
-    #   ** Warning ** message text
-    #   ** Severe  ** message text
-    #   **  Fatal  ** message text
+    return _deduplicate_diagnostics(_parse_energyplus_diagnostic_text(content))
 
-    # Split into lines and process
-    lines = content.split("\n")
-    current_message: dict[str, Any] | None = None
-    seen_messages: set[str] = set()  # Dedupe messages
 
-    def save_current() -> None:
-        nonlocal current_message
-        if current_message and current_message["text"] not in seen_messages:
-            seen_messages.add(current_message["text"])
-            messages.append(_classify_err_message(current_message))
-        current_message = None
+def parse_energyplus_diagnostics(
+    err_path: Path | None,
+    *,
+    stdout: str,
+    stderr: str,
+) -> tuple[list[dict[str, Any]], tuple[int, int, int]]:
+    """Merge native diagnostics from EnergyPlus's file and process streams.
 
-    for line in lines:
-        # Check for error markers
-        warning_match = re.match(r"\s*\*\*\s*Warning\s*\*\*\s*(.*)", line, re.IGNORECASE)
-        severe_match = re.match(r"\s*\*\*\s*Severe\s*\*\*\s*(.*)", line, re.IGNORECASE)
-        fatal_match = re.match(r"\s*\*\*\s*Fatal\s*\*\*\s*(.*)", line, re.IGNORECASE)
+    The `.err` file remains the canonical and usually most complete source.
+    EnergyPlus can fail before creating it, however, and conversion-only mode
+    can emit useful CLI diagnostics only on stdout or stderr. Findings are
+    deduplicated across sources while counts preserve EnergyPlus terminal
+    summaries and repeated markers where those are available.
 
-        # Skip summary lines (start with many asterisks)
-        if line.strip().startswith("*************"):
-            save_current()
-            continue
+    Args:
+        err_path: Optional path to the EnergyPlus `.err` output.
+        stdout: Captured EnergyPlus standard output.
+        stderr: Captured EnergyPlus standard error.
 
-        # Skip "...Summary of Errors" section
-        if "Summary of Errors" in line or "Reference severe error" in line:
-            save_current()
-            continue
+    Returns:
+        A tuple of deduplicated findings and warning/severe/fatal counts.
+    """
 
-        if fatal_match:
-            save_current()
-            current_message = {
-                "severity": "error",  # Fatal maps to error
-                "text": fatal_match.group(1).strip(),
-                "code": "ENERGYPLUS_FATAL",
-                "kind": "fatal",
-            }
-        elif severe_match:
-            save_current()
-            current_message = {
-                "severity": "error",  # Severe maps to error
-                "text": severe_match.group(1).strip(),
-                "code": "ENERGYPLUS_SEVERE",
-                "kind": "severe",
-            }
-        elif warning_match:
-            save_current()
-            current_message = {
-                "severity": "warning",
-                "text": warning_match.group(1).strip(),
-                "code": "ENERGYPLUS_WARNING",
-                "kind": "warning",
-            }
-        elif current_message and line.strip():
-            # Continuation of previous message (multi-line errors)
-            # Only append if it looks like content, not a separator
-            stripped = line.strip()
-            if not stripped.startswith("~"):
-                current_message["text"] += " " + stripped
+    err_content = ""
+    if err_path is not None and err_path.exists():
+        try:
+            err_content = err_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            logger.warning("Failed to read err file for diagnostic merging: %s", exc)
 
-    # Don't forget the last message
-    save_current()
+    messages = _deduplicate_diagnostics(
+        [
+            *_parse_energyplus_diagnostic_text(err_content),
+            *_parse_energyplus_diagnostic_text(stdout),
+            *_parse_energyplus_diagnostic_text(stderr),
+        ]
+    )
 
-    return messages
+    visible_counts = {
+        "warning": sum(message.get("kind") == "warning" for message in messages),
+        "severe": sum(message.get("kind") == "severe" for message in messages),
+        "fatal": sum(message.get("kind") == "fatal" for message in messages),
+    }
+    source_counts = [
+        _count_diagnostic_text_issues(err_content),
+        _count_diagnostic_text_issues(stdout),
+        _count_diagnostic_text_issues(stderr),
+    ]
+    warning_count = max(
+        visible_counts["warning"],
+        *(counts[0] for counts in source_counts),
+    )
+    severe_count = max(
+        visible_counts["severe"],
+        *(counts[1] for counts in source_counts),
+    )
+    fatal_count = max(
+        visible_counts["fatal"],
+        *(counts[2] for counts in source_counts),
+    )
+    return messages, (warning_count, severe_count, fatal_count)

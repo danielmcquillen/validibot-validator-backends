@@ -408,7 +408,7 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "validibot-validator-backend-energyplus@0.16.0",
+      "bom-ref": "validibot-validator-backend-energyplus@0.16.1",
       "name": "validibot-validator-backend-energyplus",
       "properties": [
         {
@@ -421,7 +421,7 @@
         }
       ],
       "type": "application",
-      "version": "0.16.0"
+      "version": "0.16.1"
     },
     "tools": [
       {
@@ -431,7 +431,7 @@
       }
     ]
   },
-  "serialNumber": "urn:uuid:f8aeb877-5643-5e4d-bd8f-e97b3ae18cb1",
+  "serialNumber": "urn:uuid:eae25ba6-5c51-59bd-8d22-39788da60af8",
   "specVersion": "1.5",
   "version": 1
 }

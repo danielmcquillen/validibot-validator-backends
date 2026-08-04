@@ -248,7 +248,7 @@ def test_provider_resource_names_are_unique_bounded_and_release_specific():
 
     assert len(names) == len(validated) * 2 * 2
     assert all(len(name) <= 63 for name in names)
-    assert "vb-vs-energyplus-v0-16-0" in names
+    assert "vb-vs-energyplus-v0-16-1" in names
     assert "vb-vj-portfolio-manager-v0-16-5-stg" in names
 
 
