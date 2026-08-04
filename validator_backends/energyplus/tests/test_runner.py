@@ -305,10 +305,24 @@ def _make_sql_db(tmp_path: Path, *, with_report_data: bool = False) -> Path:
 def test_infer_artifact_type() -> None:
     """Artifact typing should reserve each declared role for its named output."""
     assert _infer_artifact_type("eplusout.sql") == "simulation-db"
-    assert _infer_artifact_type("results.csv") == "timeseries-csv"
+    assert _infer_artifact_type("eplusout.csv") == "timeseries-csv"
     assert _infer_artifact_type("eplusout.err") == "err-log"
     assert _infer_artifact_type("sqlite.err") == "file"
     assert _infer_artifact_type("other.bin") == "file"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "epluszsz.csv",
+        "eplusssz.csv",
+        "epluspsz.csv",
+        "results.csv",
+    ],
+)
+def test_infer_artifact_type_keeps_auxiliary_csv_generic(name: str) -> None:
+    """Auxiliary CSVs must not collide with the single eplusout CSV port."""
+    assert _infer_artifact_type(name) == "file"
 
 
 # ---------------------------------------------------------------------------

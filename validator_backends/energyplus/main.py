@@ -239,7 +239,11 @@ def _infer_artifact_type(name: str) -> str:
     lowered = name.lower()
     if lowered.endswith(".sql"):
         return "simulation-db"
-    if lowered.endswith(".csv"):
+    # EnergyPlus can emit several auxiliary CSV files, including zone, system,
+    # and plant sizing summaries. Only ``eplusout.csv`` is the validator's
+    # declared time-series artifact; assigning that role to every CSV makes a
+    # valid output envelope violate the port's single-item cardinality.
+    if Path(lowered).name == "eplusout.csv":
         return "timeseries-csv"
     # EnergyPlus can emit multiple ``.err`` files. Only ``eplusout.err`` is
     # the validator's declared error-log artifact; for example, ``sqlite.err``
