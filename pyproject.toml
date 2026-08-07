@@ -89,6 +89,12 @@ portfolio_manager = [
     "xlrd==2.0.2",
 ]
 
+# PDF package inventory and bounded embedded-member extraction. pikepdf exposes
+# qpdf's structural parser without adding a renderer or script engine.
+pdf = [
+    "pikepdf==10.10.0",
+]
+
 [project.urls]
 Homepage = "https://validibot.com"
 Documentation = "https://docs.validibot.com"

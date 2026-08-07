@@ -44,3 +44,31 @@ def upload_text_report_artifact(
         sha256=stored.sha256,
         storage_version=stored.storage_version,
     )
+
+
+def upload_bytes_artifact(
+    *,
+    content: bytes,
+    execution_bundle_uri: str,
+    filename: str,
+    artifact_type: str,
+    mime_type: str,
+) -> ValidationArtifact:
+    """Upload exact backend-produced bytes as one trusted output artifact."""
+    base_uri = execution_bundle_uri.rstrip("/")
+    artifact_uri = f"{base_uri}/outputs/{filename}"
+
+    with tempfile.TemporaryDirectory(prefix="validibot-artifact-") as tmp:
+        artifact_path = Path(tmp) / filename
+        artifact_path.write_bytes(content)
+        stored = upload_file(artifact_path, artifact_uri, content_type=mime_type)
+
+    return ValidationArtifact(
+        name=filename,
+        type=artifact_type,
+        mime_type=mime_type,
+        uri=artifact_uri,
+        size_bytes=stored.size_bytes,
+        sha256=stored.sha256,
+        storage_version=stored.storage_version,
+    )
