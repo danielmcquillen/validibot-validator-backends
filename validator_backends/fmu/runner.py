@@ -15,9 +15,11 @@ from typing import TYPE_CHECKING
 
 from fmpy import read_model_description, simulate_fmu
 
-from validator_backends.core.gcs_client import download_verified_file
 from validator_backends.core.scratch import attempt_scratch_base
-from validator_backends.core.storage_client import create_attempt_work_dir
+from validator_backends.core.storage_client import (
+    create_attempt_work_dir,
+    download_verified_file,
+)
 from validibot_shared.fmu.envelopes import FMUOutputs
 
 

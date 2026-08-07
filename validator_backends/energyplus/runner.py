@@ -17,9 +17,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from validator_backends.core.gcs_client import download_verified_file
 from validator_backends.core.scratch import attempt_scratch_base
-from validator_backends.core.storage_client import create_attempt_work_dir
+from validator_backends.core.storage_client import (
+    create_attempt_work_dir,
+    download_verified_file,
+)
 from validibot_shared.energyplus.envelopes import EnergyPlusOutputs
 from validibot_shared.energyplus.models import (
     STDOUT_TAIL_CHARS,

@@ -18,11 +18,10 @@ from datetime import UTC, datetime
 from validator_backends.core.callback_client import post_callback
 from validator_backends.core.envelope_loader import get_output_uri, load_input_envelope
 from validator_backends.core.error_reporting import report_fatal
-from validator_backends.core.gcs_client import upload_envelope
 from validator_backends.core.output_identity import output_identity_for
 from validator_backends.core.replay import replay_existing_output
 from validator_backends.core.report_artifacts import upload_text_report_artifact
-from validator_backends.core.storage_client import StorageConflictError
+from validator_backends.core.storage_client import StorageConflictError, upload_envelope
 from validator_backends.shacl.runner import run_shacl_validation
 from validibot_shared.shacl.envelopes import SHACLInputEnvelope, SHACLOutputEnvelope
 from validibot_shared.validations.envelopes import (
