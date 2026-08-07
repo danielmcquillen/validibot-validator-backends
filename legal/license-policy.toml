@@ -13,6 +13,14 @@ allowed_expressions = [
   "ISC",
   "MIT",
   "MIT-0",
+  # Reviewed 2026-08-07 for Pillow, pulled in as a required dependency of
+  # pikepdf by the PDF backend. MIT-CMU is the original PIL license: permissive
+  # and non-copyleft, adding only a notice-retention duty (satisfied by the
+  # wheel license files this script copies into the image) and a bar on using
+  # the authors' names in advertising. Pillow's wheels also vendor image codecs
+  # (libjpeg, zlib, libtiff, brotli, ...) whose own permissive notices ship in
+  # the same LICENSE file and are copied with it.
+  "MIT-CMU",
   "MPL-2.0",
   "PSF-2.0",
   "Python-2.0",
